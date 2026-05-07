@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>퍼블리싱 코드 자동 검수 도구</title>
+    <link rel="stylesheet" href="/static/css/main.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🔍 퍼블리싱 코드 자동 검수</h1>
+            <p class="subtitle">VCP 퍼블리싱 코드의 품질을 자동으로 검사합니다</p>
+        </header>
+
+        <main class="main">
+            <!-- 파일 업로드 영역 -->
+            <section class="upload-section">
+                <div class="upload-box" id="dropZone">
+                    <div class="upload-icon">📦</div>
+                    <p class="upload-text">ZIP 파일을 여기에 끌어다 놓으세요</p>
+                    <p class="upload-sub">또는</p>
+                    <label class="upload-btn" for="fileInput">
+                        파일 선택하기
+                    </label>
+                    <input type="file" id="fileInput" accept=".zip" hidden>
+                    <p class="upload-hint">퍼블리싱 코드가 담긴 ZIP 파일만 가능합니다</p>
+                </div>
+
+                <div class="file-info hidden" id="fileInfo">
+                    <span class="file-icon">📄</span>
+                    <span class="file-name" id="fileName"></span>
+                    <button class="file-remove" id="fileRemove">✕</button>
+                </div>
+            </section>
+
+            <!-- 검수 기준 선택 -->
+            <section class="rules-section">
+                <h2>검수 기준 선택</h2>
+                <p class="rules-desc">검사할 항목을 선택하세요 (기본: 전체 선택)</p>
+                <div class="rules-grid">
+                    <label class="rule-item">
+                        <input type="checkbox" name="rules" value="typography" checked>
+                        <div class="rule-content">
+                            <span class="rule-icon">🔤</span>
+                            <span class="rule-name">타이포그래피</span>
+                            <span class="rule-desc">폰트 크기/굵기/줄간격 직접 입력 여부</span>
+                        </div>
+                    </label>
+                    <label class="rule-item">
+                        <input type="checkbox" name="rules" value="color" checked>
+                        <div class="rule-content">
+                            <span class="rule-icon">🎨</span>
+                            <span class="rule-name">색상</span>
+                            <span class="rule-desc">하드코딩된 색상 코드 중복 여부</span>
+                        </div>
+                    </label>
+                    <label class="rule-item">
+                        <input type="checkbox" name="rules" value="important" checked>
+                        <div class="rule-content">
+                            <span class="rule-icon">⚠️</span>
+                            <span class="rule-name">!important</span>
+                            <span class="rule-desc">CSS !important 과다 사용 여부</span>
+                        </div>
+                    </label>
+                    <label class="rule-item">
+                        <input type="checkbox" name="rules" value="scrollbar" checked>
+                        <div class="rule-content">
+                            <span class="rule-icon">📜</span>
+                            <span class="rule-name">스크롤바</span>
+                            <span class="rule-desc">브라우저 호환성 없는 스크롤바 스타일</span>
+                        </div>
+                    </label>
+                </div>
+            </section>
+
+            <!-- 검수 시작 버튼 -->
+            <section class="action-section">
+                <button class="start-btn" id="startBtn" disabled>
+                    검수 시작하기
+                </button>
+            </section>
+
+            <!-- 진행 상황 -->
+            <section class="progress-section hidden" id="progressSection">
+                <h2>검수 진행 중...</h2>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <p class="progress-text" id="progressText">파일 분석 중...</p>
+            </section>
+
+            <!-- 결과 요약 -->
+            <section class="result-section hidden" id="resultSection">
+                <h2>📊 검수 결과</h2>
+                <div class="summary-cards" id="summaryCards"></div>
+                <div class="issues-list" id="issuesList"></div>
+                <div class="action-btns">
+                    <button class="download-btn" id="downloadBtn">📥 결과 다운로드</button>
+                    <button class="reset-btn" id="resetBtn">다시 검수하기</button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="/static/js/main.js"></script>
+</body>
+</html>

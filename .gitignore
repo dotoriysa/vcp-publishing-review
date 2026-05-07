@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+env/
+.venv/
+
+# 임시 파일
+*.tmp
+temp/
+uploads/
+
+# 퍼블리싱 ZIP 파일 (용량이 크므로 git에서 제외)
+퍼블리싱 파일/*.zip
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 클로드 내부 파일
+.claude/
