@@ -94,13 +94,55 @@
             <section class="result-section hidden" id="resultSection">
                 <h2>📊 검수 결과</h2>
                 <div class="summary-cards" id="summaryCards"></div>
+
+                <!-- AI 분석 섹션 -->
+                <div class="ai-section" id="aiSection">
+                    <div class="ai-section-header">✦ AI 코드 리뷰</div>
+                    <div class="ai-body" id="aiBody">
+                        <div class="ai-loading">
+                            <span class="ai-spinner"></span> Claude가 코드를 분석하고 있습니다...
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 필터 툴바 -->
+                <div class="filter-toolbar" id="filterToolbar" style="display:none">
+                    <div class="filter-groups" id="filterGroups"></div>
+                    <div class="view-toggle">
+                        <button class="view-btn active" id="viewIssue" onclick="setView('issue')">이슈별</button>
+                        <button class="view-btn" id="viewFile" onclick="setView('file')">파일별</button>
+                    </div>
+                </div>
+                <div class="filter-count" id="filterCount"></div>
+
                 <div class="issues-list" id="issuesList"></div>
                 <div class="action-btns">
-                    <button class="download-btn" id="downloadBtn">📥 결과 다운로드</button>
+                    <button class="download-btn" id="downloadHtmlBtn">HTML 다운로드</button>
+                    <button class="excel-btn" id="downloadExcelBtn">엑셀 다운로드</button>
+                    <button class="mail-btn" id="draftMailBtn">원더무브 메일 초안</button>
                     <button class="reset-btn" id="resetBtn">다시 검수하기</button>
                 </div>
             </section>
         </main>
+    </div>
+
+    <!-- 메일 초안 모달 -->
+    <div class="modal-overlay hidden" id="mailModal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span class="modal-title">원더무브 발송 메일 초안</span>
+                <button class="modal-close" onclick="closeMailModal()">✕</button>
+            </div>
+            <div class="modal-body" id="mailModalBody">
+                <div class="mail-loading">
+                    <span class="ai-spinner"></span> Claude가 메일을 작성하고 있습니다...
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="copy-btn" id="copyMailBtn" onclick="copyMail()">클립보드 복사</button>
+                <button class="modal-cancel" onclick="closeMailModal()">닫기</button>
+            </div>
+        </div>
     </div>
 
     <script src="/static/js/main.js"></script>

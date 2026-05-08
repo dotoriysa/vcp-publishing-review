@@ -62,6 +62,10 @@ class ColorRule(BaseRule):
                     if suggestion
                     else 'CSS 변수 또는 테마 색상 토큰으로 교체 권고'
                 )
+                occurrences = [
+                    {'line': ln, 'code': code, 'file': fp}
+                    for fp, ln, code in usages
+                ]
                 issues.append(self._make_issue(
                     file=usages[0][0],
                     line=usages[0][1],
@@ -69,7 +73,7 @@ class ColorRule(BaseRule):
                         f'색상 코드 "{color}"이(가) 전체 코드에서 {len(usages)}번 사용됩니다. '
                         f'({MAX_COLOR_DUPLICATES}개 이상 권고 기준 초과)'
                     ),
-                    before=f'{color} (직접 입력)',
+                    before=usages[0][2],
                     after=after_text,
                     reason=(
                         f'같은 색상을 {len(usages)}곳에 직접 입력하면, '
@@ -77,12 +81,17 @@ class ColorRule(BaseRule):
                         'HMG Design System의 색상 변수를 사용하면 한 번만 바꾸면 됩니다.'
                     ),
                     severity='critical' if len(usages) >= MAX_COLOR_DUPLICATES * 2 else 'warning',
+                    occurrences=occurrences,
                 ))
 
             # 규칙 2-2: HMG 디자인 시스템 색상을 직접 입력한 경우
             elif color in HMG_DESIGN_COLORS or color_upper in HMG_DESIGN_COLORS:
                 suggestion = HMG_DESIGN_COLORS.get(color) or HMG_DESIGN_COLORS.get(color_upper, '')
                 if len(usages) > 1:  # 2회 이상 사용 시 경고
+                    occurrences = [
+                        {'line': ln, 'code': code, 'file': fp}
+                        for fp, ln, code in usages
+                    ]
                     issues.append(self._make_issue(
                         file=usages[0][0],
                         line=usages[0][1],
@@ -90,13 +99,14 @@ class ColorRule(BaseRule):
                             f'HMG 디자인 시스템 색상 "{color}"이(가) '
                             f'{len(usages)}번 직접 입력되었습니다.'
                         ),
-                        before=f'{color} (직접 입력)',
+                        before=usages[0][2],
                         after=f'import {{ colors }} from \'@/shared/theme\';\n{suggestion}',
                         reason=(
                             f'이 색상({color})은 HMG 디자인 시스템에 이미 정의된 색상입니다. '
                             '직접 입력 대신 테마 변수를 사용해야 디자인 일관성이 유지됩니다.'
                         ),
                         severity='warning',
+                        occurrences=occurrences,
                     ))
 
         return issues

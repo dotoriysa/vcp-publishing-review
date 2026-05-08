@@ -48,8 +48,11 @@ class BaseRule(ABC):
         after: str = '',
         reason: str = '',
         severity: str = 'warning',
+        occurrences: list = None,
     ) -> Dict[str, Any]:
-        """문제 항목 생성 헬퍼"""
+        """문제 항목 생성 헬퍼
+        occurrences: [{'line': 줄번호, 'code': 코드내용, 'file': 파일(선택)}, ...]
+        """
         return {
             'category': self.category,
             'severity': severity,
@@ -59,4 +62,5 @@ class BaseRule(ABC):
             'before': before,
             'after': after,
             'reason': reason,
+            'occurrences': occurrences or [],
         }

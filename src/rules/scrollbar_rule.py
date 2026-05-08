@@ -29,22 +29,24 @@ class ScrollbarRule(BaseRule):
 
             if has_webkit and not has_standard and not has_scrollbar_sx:
                 # 웹킷 스크롤바만 있고 표준 속성이 없는 경우
-                line_num = 0
-                before_code = ''
+                first_line_num = 0
+                first_code = ''
+                occurrences = []
                 for i, line in enumerate(content.splitlines(), start=1):
                     if '::-webkit-scrollbar' in line:
-                        line_num = i
-                        before_code = line.strip()
-                        break
+                        if first_line_num == 0:
+                            first_line_num = i
+                            first_code = line.strip()
+                        occurrences.append({'line': i, 'code': line.strip()})
 
                 issues.append(self._make_issue(
                     file=filepath,
-                    line=line_num,
+                    line=first_line_num,
                     description=(
                         '스크롤바 스타일이 크롬/사파리(웹킷)에서만 적용됩니다. '
                         '파이어폭스 등 다른 브라우저에서는 스크롤바가 다르게 보일 수 있습니다.'
                     ),
-                    before=before_code,
+                    before=first_code,
                     after=(
                         '방법 1: scrollbarWidth: \'thin\' 등 표준 CSS 속성 추가\n'
                         '방법 2: @/shared/theme에서 scrollbarSx 유틸리티 가져와 재사용'
@@ -55,6 +57,7 @@ class ScrollbarRule(BaseRule):
                         '모든 브라우저에서 동작하는 표준 방식을 함께 사용해야 합니다.'
                     ),
                     severity='warning',
+                    occurrences=occurrences,
                 ))
 
         return issues

@@ -52,6 +52,10 @@ class TypographyRule(BaseRule):
 
             # 규칙 1-1: 한 파일에 타이포 속성이 너무 많은 경우
             if len(file_matches) >= MAX_TYPOGRAPHY_PER_FILE:
+                occurrences = [
+                    {'line': ln, 'code': code}
+                    for ln, code, _ in file_matches
+                ]
                 issues.append(self._make_issue(
                     file=filepath,
                     line=file_matches[0][0],
@@ -67,12 +71,23 @@ class TypographyRule(BaseRule):
                         '모든 파일을 일일이 수정해야 합니다.'
                     ),
                     severity='critical' if len(file_matches) >= MAX_TYPOGRAPHY_PER_FILE * 2 else 'warning',
+                    occurrences=occurrences,
                 ))
 
         # 규칙 1-2: 동일한 값이 여러 컴포넌트에서 반복
         for value, file_list in value_usage.items():
             unique_files = list(set(file_list))
             if len(unique_files) >= MAX_DUPLICATE_COMPONENTS:
+                # 파일명을 포함한 occurrences
+                occ_seen = set()
+                occ_list = []
+                for filepath, content in files.items():
+                    for line_num, line in enumerate(content.splitlines(), start=1):
+                        for pattern in COMPILED_PATTERNS:
+                            for m in pattern.findall(line):
+                                if m == value and (filepath, line_num) not in occ_seen:
+                                    occ_seen.add((filepath, line_num))
+                                    occ_list.append({'line': line_num, 'code': line.strip(), 'file': filepath})
                 issues.append(self._make_issue(
                     file=unique_files[0],
                     line=0,
@@ -87,6 +102,7 @@ class TypographyRule(BaseRule):
                         '공통 변수 하나만 바꾸면 전체가 바뀌도록 개선이 필요합니다.'
                     ),
                     severity='warning',
+                    occurrences=occ_list,
                 ))
 
         return issues

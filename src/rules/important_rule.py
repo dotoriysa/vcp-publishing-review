@@ -34,6 +34,7 @@ class ImportantRule(BaseRule):
             total_count += len(file_matches)
 
             if len(file_matches) >= MAX_IMPORTANT_PER_FILE:
+                occurrences = [{'line': ln, 'code': code} for ln, code in file_matches]
                 issues.append(self._make_issue(
                     file=filepath,
                     line=file_matches[0][0],
@@ -48,6 +49,7 @@ class ImportantRule(BaseRule):
                         '꼭 필요한 경우가 아니라면 사용하지 않는 것이 좋습니다.'
                     ),
                     severity='warning',
+                    occurrences=occurrences,
                 ))
 
         # 전체 합계 경고
