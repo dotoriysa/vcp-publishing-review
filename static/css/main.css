@@ -252,6 +252,73 @@ body {
     line-height: 1.5;
 }
 
+/* HAE Design System 옵션 섹션 */
+.hae-section {
+    margin-top: 22px;
+    padding-top: 20px;
+    border-top: 1px dashed #c5cfe0;
+}
+
+.hae-section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.hae-badge {
+    display: inline-block;
+    padding: 3px 9px;
+    background: #002c5f;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 4px;
+    letter-spacing: 0.02em;
+}
+
+.hae-section-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0d1b34;
+}
+
+.hae-optional {
+    font-weight: 400;
+    color: #5a6a84;
+    font-size: 12px;
+}
+
+.hae-section-desc {
+    font-size: 12px;
+    color: #5a6a84;
+    line-height: 1.6;
+    margin-bottom: 14px;
+}
+
+.hae-rules-grid {
+    grid-template-columns: 1fr 1fr;
+}
+
+.hae-rule-item {
+    border-color: #b8c9e0;
+    background: #f7f9fc;
+}
+
+.hae-rule-item:hover {
+    border-color: #002c5f;
+    background: #edf1f8;
+}
+
+.hae-rule-item:has(input:checked) {
+    border-color: #002c5f;
+    background: #e8eef8;
+}
+
+.hae-rule-item input {
+    accent-color: #002c5f;
+}
+
 /* 검수 버튼 */
 .action-section {
     text-align: center;

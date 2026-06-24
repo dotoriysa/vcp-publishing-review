@@ -14,6 +14,8 @@ from src.rules.style_mixing_rule import StyleMixingRule
 from src.rules.console_log_rule import ConsoleLogRule
 from src.rules.zindex_rule import ZIndexRule
 from src.rules.accessibility_rule import AccessibilityRule
+from src.rules.hae_color_rule import HaeColorRule
+from src.rules.hae_typography_rule import HaeTypographyRule
 
 
 SUPPORTED_EXTENSIONS = {'.tsx', '.ts', '.jsx', '.js', '.css', '.scss', '.html'}
@@ -28,6 +30,9 @@ RULE_MAP = {
     'console_log': ConsoleLogRule,
     'zindex': ZIndexRule,
     'accessibility': AccessibilityRule,
+    # HAE Design System 선택 기준 (옵션)
+    'hae_color': HaeColorRule,
+    'hae_typography': HaeTypographyRule,
 }
 
 
