@@ -11,7 +11,7 @@ import traceback
 import zipfile
 import tempfile
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, Response, stream_with_context
 from openpyxl import Workbook
 from openpyxl.styles import (
     Font, PatternFill, Alignment, Border, Side, numbers
@@ -25,6 +25,9 @@ app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 최대 200MB
 # 가장 최근 검수 파일 내용 보관 (AI 수정 제안 시 컨텍스트 제공용)
 # {filepath: content} — 단일 세션만 유지 (메모리 절약)
 _last_review_files: dict = {}
+
+# AI 전체 검수 결과 보관 (메일 초안 생성용)
+_last_ai_findings: list = []
 
 
 @app.route('/')
@@ -864,6 +867,152 @@ def draft_mail():
     return jsonify({'mail': text})
 
 
+@app.route('/api/ai-full-review-stream')
+def ai_full_review_stream():
+    """파일별 AI 전체 검수 — Server-Sent Events로 실시간 스트리밍"""
+
+    def generate():
+        global _last_ai_findings
+        _last_ai_findings = []
+
+        files = _last_review_files
+        if not files:
+            yield f"data: {json.dumps({'type': 'error', 'message': '분석할 파일이 없습니다. 자동 검수 탭에서 ZIP을 먼저 업로드해주세요.'}, ensure_ascii=False)}\n\n"
+            return
+
+        total = len(files)
+        yield f"data: {json.dumps({'type': 'start', 'total': total}, ensure_ascii=False)}\n\n"
+
+        for i, (filepath, content) in enumerate(files.items()):
+            yield f"data: {json.dumps({'type': 'progress', 'current': i + 1, 'total': total, 'file': filepath}, ensure_ascii=False)}\n\n"
+
+            lines = content.splitlines()
+            truncated = len(lines) > 200
+            snippet = '\n'.join(lines[:200]) if truncated else content
+            trunc_note = f'\n(이하 {len(lines) - 200}줄 생략)' if truncated else ''
+
+            prompt = f"""당신은 현대자동차그룹 VCP(Vehicle Content Platform) 퍼블리싱 코드 품질 검수 전문가입니다.
+아래 파일 원문을 꼼꼼히 읽고, HMG 디자인 시스템 및 현대오토에버 검수 기준에 따라 위반 사항을 모두 발견해주세요.
+
+【파일명】 {filepath}
+【소스코드】
+{snippet}{trunc_note}
+
+【검수 기준 (현대오토에버 VCP 기준 전체)】
+1. 색상: #hex 직접 사용 금지 → colors.gray900 / colors.primary 등 HMG 토큰 사용
+   매핑: #111111→colors.gray900, #666→colors.gray500, #999→colors.gray400,
+         #ccc→colors.gray200, #f5f5f5→colors.gray50, #0064ff→colors.primary,
+         rgba(0,0,0,0.5)→colors.dimmed 등
+2. 타이포그래피: font-size/font-weight/line-height 하드코딩 금지 → theme.typography.body1 등 MUI 토큰
+3. !important 남용: 한 줄에 2개 이상 또는 불필요한 반복 사용
+4. 스크롤바: ::-webkit-scrollbar 커스터마이징 지양 (크로스브라우저 미지원)
+5. Gradient 하드코딩: linear-gradient/radial-gradient 직접 사용 금지
+6. 스타일 혼용: inline style={{}} + sx prop 혼용 금지, makeStyles/withStyles 사용 금지
+7. console.log / debugger 잔류 (배포 코드에 금지)
+8. z-index 매직넘버: 100 이상 직접 사용 금지 → theme.zIndex.modal(1400) 등
+9. 접근성: outline:none·outline:0 사용 금지, <img> alt 누락, <button> type 누락
+10. 그 외 VCP 기준에 어긋나는 명백한 코드 품질 문제
+
+【출력 형식】
+발견된 이슈를 아래 JSON 배열로만 출력하세요. JSON 외 다른 텍스트는 절대 출력하지 마세요.
+이슈가 없으면 [] 출력.
+
+[
+  {{
+    "line": 줄번호(숫자),
+    "severity": "critical" 또는 "warning",
+    "category": "카테고리명",
+    "description": "위반 내용 한 줄 설명",
+    "before": "수정 전 실제 코드 (해당 줄 그대로)",
+    "after": "수정 후 코드 (VCP 기준 준수, 여러 줄이면 \\n 사용)"
+  }}
+]"""
+
+            text = _call_claude(prompt)
+            issues: list = []
+            if text:
+                try:
+                    json_match = re.search(r'\[.*\]', text, re.DOTALL)
+                    if json_match:
+                        parsed = json.loads(json_match.group())
+                        if isinstance(parsed, list):
+                            issues = parsed[:20]  # 파일당 최대 20개
+                except (json.JSONDecodeError, ValueError):
+                    pass
+
+            file_result = {'file': filepath, 'issues': issues}
+            _last_ai_findings.append(file_result)
+
+            yield f"data: {json.dumps({'type': 'result', 'file': filepath, 'issues': issues, 'current': i + 1, 'total': total}, ensure_ascii=False)}\n\n"
+
+        yield f"data: {json.dumps({'type': 'done', 'total_files': total}, ensure_ascii=False)}\n\n"
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'X-Accel-Buffering': 'no',
+        },
+    )
+
+
+@app.route('/api/ai-full-mail', methods=['POST'])
+def ai_full_mail():
+    """AI 전체 검수 결과를 바탕으로 원더무브 발송 메일 초안 생성"""
+    data = request.get_json()
+    findings = data.get('findings') or _last_ai_findings
+    filename = data.get('filename', 'VCP')
+
+    if not findings:
+        return jsonify({'error': '검수 결과가 없습니다. AI 전체 검수를 먼저 완료해주세요.'}), 400
+
+    today = datetime.now().strftime('%Y년 %m월 %d일')
+    total_issues = sum(len(f.get('issues', [])) for f in findings)
+    critical_count = sum(
+        1 for f in findings for iss in f.get('issues', []) if iss.get('severity') == 'critical'
+    )
+    warning_count = total_issues - critical_count
+
+    # 파일별 이슈 요약 (메일 본문용)
+    issue_lines = []
+    for file_result in findings:
+        fp = file_result.get('file', '')
+        for iss in file_result.get('issues', [])[:5]:  # 파일당 최대 5개
+            sev = '수정 필수' if iss.get('severity') == 'critical' else '개선 권고'
+            ln = iss.get('line', '-')
+            desc = iss.get('description', '')
+            issue_lines.append(f"  [{sev}] {fp} L.{ln}: {desc}")
+
+    prompt = f"""아래 VCP 퍼블리싱 코드 AI 검수 결과를 바탕으로 원더무브 담당자에게 발송할 공문 메일 초안을 작성해주세요.
+
+【검수 결과 요약】
+- 대상 파일: {filename}
+- 검수일: {today}
+- AI 직접 검수 (Claude)
+- 수정 필수: {critical_count}건
+- 개선 권고: {warning_count}건
+- 총 이슈: {total_issues}건
+
+【주요 발견 이슈 (파일별 최대 5건, 총 {min(len(issue_lines), 50)}건 발췌)】
+{chr(10).join(issue_lines[:50])}
+
+【이메일 작성 조건】
+1. 한국 대기업 공문 스타일 (정중하고 격식 있는 표현)
+2. 수신: 원더무브 담당자  발신: INNOCEAN 담당자 ([담당자명] 자리 표시)
+3. 제목 포함
+4. 발견된 이슈를 카테고리별로 정리 (파일명, 줄번호, 내용)
+5. 수정 요청 + 수정본 전달 일정 회신 요청 포함
+6. Outlook에 바로 붙여넣기 가능한 텍스트 형식 (HTML 태그 없이)
+7. 이메일 본문만 출력 (설명/마크다운 없이)"""
+
+    text = _call_claude(prompt)
+    if not text:
+        return jsonify({'error': 'Claude CLI를 찾을 수 없습니다'}), 500
+
+    return jsonify({'mail': text})
+
+
 @app.route('/api/ai-deep-review', methods=['POST'])
 def ai_deep_review():
     """이슈 상위 파일을 AI가 직접 읽고 규칙 엔진이 놓친 추가 이슈 발견"""
@@ -955,4 +1104,5 @@ def ai_deep_review():
 if __name__ == '__main__':
     print("퍼블리싱 코드 검수 도구를 시작합니다...")
     print("브라우저에서 http://localhost:5000 을 열어주세요")
-    app.run(debug=True, port=5000)
+    # threaded=True: SSE 스트리밍 중 다른 요청 처리 가능
+    app.run(debug=True, port=5000, threaded=True)

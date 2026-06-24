@@ -7,6 +7,13 @@ let doneSet = new Set(); // 처리완료된 이슈 인덱스
 let activeFilter = { severity: 'all', category: 'all', undoneOnly: false };
 let viewMode = 'issue';
 
+// AI 전체 검수 탭 상태
+let aiFullFindings = [];
+let aiFullEventSource = null;
+let aiFullTotalFiles = 0;
+let aiFullFoundCount = 0;
+let aiFullIssueIndex = 0; // 전역 이슈 인덱스 (아코디언 ID용)
+
 // 요소 참조
 const dropZone = document.getElementById('dropZone');
 const fileInput = document.getElementById('fileInput');
@@ -169,6 +176,7 @@ function showResults(data) {
         applyFilters();
         fetchAiSummary(data);
         fetchAiDeepReview(data);
+        updateAiTabStatus(data.summary.total_files);
     }, 500);
 }
 
@@ -784,6 +792,227 @@ function copyMail() {
 document.addEventListener('keydown', e => {
     if (e.key === 'Escape') closeMailModal();
 });
+
+// ─────────────────────────────────────────────────
+//  탭 전환
+// ─────────────────────────────────────────────────
+function switchTab(name) {
+    const isAuto = name === 'auto';
+    document.getElementById('tabAuto').classList.toggle('hidden', !isAuto);
+    document.getElementById('tabAi').classList.toggle('hidden', isAuto);
+    document.getElementById('tabBtnAuto').classList.toggle('active', isAuto);
+    document.getElementById('tabBtnAi').classList.toggle('active', !isAuto);
+}
+
+// ─────────────────────────────────────────────────
+//  AI 전체 검수 탭 — 파일 상태 표시
+// ─────────────────────────────────────────────────
+function updateAiTabStatus(fileCount) {
+    const statusEl = document.getElementById('aiFullFileStatus');
+    const startBtn = document.getElementById('aiFullStartBtn');
+    if (!statusEl || !startBtn) return;
+    if (fileCount > 0) {
+        statusEl.innerHTML = `<strong>${fileCount}개</strong> 파일이 로드되었습니다. AI 검수를 시작하면 파일별로 순차 분석합니다.`;
+        startBtn.disabled = false;
+    } else {
+        statusEl.textContent = '자동 검수 탭에서 ZIP 파일을 먼저 업로드하고 검수를 실행해주세요.';
+        startBtn.disabled = true;
+    }
+}
+
+// ─────────────────────────────────────────────────
+//  AI 전체 검수 — SSE 시작
+// ─────────────────────────────────────────────────
+function startAiFullReview() {
+    if (aiFullEventSource) {
+        aiFullEventSource.close();
+        aiFullEventSource = null;
+    }
+
+    // 상태 초기화
+    aiFullFindings = [];
+    aiFullTotalFiles = 0;
+    aiFullFoundCount = 0;
+    aiFullIssueIndex = 0;
+
+    document.getElementById('aiFullStartBtn').disabled = true;
+    document.getElementById('aiFullProgressSection').classList.remove('hidden');
+    document.getElementById('aiFullResults').classList.remove('hidden');
+    document.getElementById('aiFullResults').innerHTML = '';
+    document.getElementById('aiFullActionBtns').classList.add('hidden');
+    document.getElementById('aiFullFoundCount').textContent = '';
+    document.getElementById('aiFullProgressFile').textContent = '연결 중...';
+
+    aiFullEventSource = new EventSource('/api/ai-full-review-stream');
+
+    aiFullEventSource.onmessage = (event) => {
+        let data;
+        try { data = JSON.parse(event.data); } catch { return; }
+
+        if (data.type === 'start') {
+            aiFullTotalFiles = data.total;
+            document.getElementById('aiFullProgressCount').textContent = `0 / ${data.total}`;
+            document.getElementById('aiFullProgressFill').style.width = '0%';
+        } else if (data.type === 'progress') {
+            const pct = Math.round((data.current - 1) / data.total * 100);
+            document.getElementById('aiFullProgressFill').style.width = pct + '%';
+            document.getElementById('aiFullProgressCount').textContent = `${data.current} / ${data.total}`;
+            document.getElementById('aiFullProgressFile').textContent = `분석 중: ${data.file}`;
+        } else if (data.type === 'result') {
+            aiFullFindings.push({ file: data.file, issues: data.issues });
+            aiFullFoundCount += (data.issues || []).length;
+            const pct = Math.round(data.current / data.total * 100);
+            document.getElementById('aiFullProgressFill').style.width = pct + '%';
+            document.getElementById('aiFullProgressCount').textContent = `${data.current} / ${data.total}`;
+            document.getElementById('aiFullFoundCount').textContent = `현재까지 발견된 이슈: ${aiFullFoundCount}건`;
+            renderAiFullFileResult(data.file, data.issues || []);
+        } else if (data.type === 'done') {
+            aiFullEventSource.close();
+            aiFullEventSource = null;
+            onAiFullDone();
+        } else if (data.type === 'error') {
+            aiFullEventSource.close();
+            aiFullEventSource = null;
+            showAiFullError(data.message);
+        }
+    };
+
+    aiFullEventSource.onerror = () => {
+        if (aiFullEventSource) {
+            aiFullEventSource.close();
+            aiFullEventSource = null;
+        }
+        showAiFullError('서버 연결이 끊겼습니다. 다시 시도해주세요.');
+    };
+}
+
+function onAiFullDone() {
+    document.getElementById('aiFullProgressFile').textContent = '검수 완료!';
+    document.getElementById('aiFullProgressFill').style.width = '100%';
+    document.getElementById('aiFullFoundCount').textContent = `총 발견된 이슈: ${aiFullFoundCount}건 (${aiFullTotalFiles}개 파일)`;
+    document.getElementById('aiFullStartBtn').disabled = false;
+    document.getElementById('aiFullActionBtns').classList.remove('hidden');
+}
+
+function showAiFullError(msg) {
+    document.getElementById('aiFullProgressFile').textContent = `오류: ${msg}`;
+    document.getElementById('aiFullStartBtn').disabled = false;
+}
+
+// ─────────────────────────────────────────────────
+//  AI 전체 검수 — 파일 결과 렌더링 (실시간 추가)
+// ─────────────────────────────────────────────────
+function renderAiFullFileResult(filepath, issues) {
+    const resultsEl = document.getElementById('aiFullResults');
+    const critCount = issues.filter(i => i.severity === 'critical').length;
+    const warnCount = issues.filter(i => i.severity === 'warning').length;
+
+    const hasCritical = critCount > 0;
+    const badgeClass = hasCritical ? 'has-critical' : (warnCount > 0 ? 'only-warning' : 'no-issue');
+    const badgeText = issues.length === 0
+        ? '이슈 없음'
+        : (hasCritical
+            ? `심각 ${critCount}건${warnCount ? ` · 주의 ${warnCount}건` : ''}`
+            : `주의 ${warnCount}건`);
+
+    const groupId = 'aif-' + filepath.replace(/[^a-zA-Z0-9]/g, '_');
+
+    const issueCards = issues.map(issue => {
+        const idx = aiFullIssueIndex++;
+        const cardId = `aicard-${idx}`;
+        const beforeHtml = issue.before
+            ? `<div class="ai-full-code-label">수정 전</div><pre class="ai-full-before">${escapeHtml(issue.before)}</pre>`
+            : '';
+        const afterHtml = issue.after
+            ? `<div class="ai-full-code-label">수정 후</div><pre class="ai-full-after">${escapeHtml(issue.after)}</pre>`
+            : '';
+        return `
+            <div class="ai-full-issue-card" id="${cardId}">
+                <div class="ai-full-issue-top">
+                    <span class="issue-severity ${issue.severity || 'warning'}">${issue.severity === 'critical' ? '수정 필수' : '개선 권고'}</span>
+                    <span class="issue-category">${escapeHtml(issue.category || '')}</span>
+                    <span class="ai-full-line">L.${issue.line || '?'}</span>
+                    <span class="ai-full-desc">${escapeHtml(issue.description || '')}</span>
+                </div>
+                ${beforeHtml}${afterHtml}
+            </div>`;
+    }).join('');
+
+    const noIssueHtml = issues.length === 0
+        ? '<div class="ai-full-no-issue">이 파일에서 발견된 추가 이슈 없음</div>'
+        : '';
+
+    const fileBlock = document.createElement('div');
+    fileBlock.className = 'ai-full-file';
+    fileBlock.id = 'aifile-' + groupId;
+    fileBlock.innerHTML = `
+        <div class="ai-full-file-header" onclick="toggleAiFullFile('${groupId}')">
+            <span class="ai-full-file-name">${escapeHtml(filepath)}</span>
+            <span class="file-group-badge ${badgeClass}">${badgeText}</span>
+            <span class="file-group-arrow open" id="arrow-${groupId}">▼</span>
+        </div>
+        <div class="ai-full-file-body" id="${groupId}">
+            ${issueCards}${noIssueHtml}
+        </div>`;
+
+    resultsEl.appendChild(fileBlock);
+}
+
+function toggleAiFullFile(groupId) {
+    const body = document.getElementById(groupId);
+    const arrow = document.getElementById('arrow-' + groupId);
+    const isOpen = !body.classList.contains('hidden');
+    body.classList.toggle('hidden', isOpen);
+    if (arrow) arrow.classList.toggle('open', !isOpen);
+}
+
+// ─────────────────────────────────────────────────
+//  AI 전체 검수 — 메일 초안
+// ─────────────────────────────────────────────────
+async function draftAiFullMail() {
+    openMailModal();
+    document.getElementById('mailModalBody').innerHTML =
+        `<div class="mail-loading"><span class="ai-spinner"></span> Claude가 메일을 작성하고 있습니다...</div>`;
+    try {
+        const body = {
+            findings: aiFullFindings,
+            filename: selectedFile ? selectedFile.name.replace('.zip', '') : 'VCP',
+        };
+        const res = await fetch('/api/ai-full-mail', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (data.error) throw new Error(data.error);
+        mailContent = data.mail;
+        document.getElementById('mailModalBody').innerHTML =
+            `<div class="mail-text">${escapeHtml(mailContent)}</div>`;
+    } catch (e) {
+        document.getElementById('mailModalBody').innerHTML =
+            `<div style="color:#c0392b;padding:20px">메일 초안 생성에 실패했습니다: ${e.message}</div>`;
+    }
+}
+
+// ─────────────────────────────────────────────────
+//  AI 전체 검수 — 리셋
+// ─────────────────────────────────────────────────
+function resetAiFullReview() {
+    if (aiFullEventSource) {
+        aiFullEventSource.close();
+        aiFullEventSource = null;
+    }
+    aiFullFindings = [];
+    aiFullFoundCount = 0;
+    aiFullTotalFiles = 0;
+    aiFullIssueIndex = 0;
+
+    document.getElementById('aiFullProgressSection').classList.add('hidden');
+    document.getElementById('aiFullResults').classList.add('hidden');
+    document.getElementById('aiFullResults').innerHTML = '';
+    document.getElementById('aiFullActionBtns').classList.add('hidden');
+    document.getElementById('aiFullStartBtn').disabled = !lastReportData;
+}
 
 // 리셋
 resetBtn.addEventListener('click', () => {
