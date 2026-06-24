@@ -209,17 +209,23 @@ def suggest_fix():
     # 카테고리별 가이드라인 컨텍스트 (HMG 매핑 포함, 단호한 어조)
     guidelines = {
         '타이포그래피': (
-            '【위반 기준】 fontSize / fontWeight / lineHeight 등의 값을 숫자로 직접 입력하는 것은\n'
-            '현대오토에버 VCP 코드 가이드라인 위반입니다. 반드시 HMG 디자인 시스템 토큰을 사용해야 합니다.\n\n'
+            '【위반 기준】 font-size / font-weight / line-height / font-family 등을 숫자나 문자로\n'
+            '직접 입력하는 것은 현대오토에버 VCP 코드 가이드라인 위반입니다.\n'
+            '반드시 HAE Design System 타이포그래피 CSS 커스텀 프로퍼티(--typo-*)를 사용해야 합니다.\n\n'
+            '【HAE Design System 타이포 토큰 체계】\n'
+            '  폰트 패밀리: Asta Sans  →  var(--typo-font-family-asta-sans)\n'
+            '  허용 굵기: 300(light) / 400(regular) / 600(semibold) / 700(bold)\n'
+            '  허용 크기(px): 11 12 13 14 15 16 17 18 19 20 21 23 24 25 29 32 36 37 41 45 48 56\n\n'
+            '  body    11-20px → var(--typo-body-{size}-regular/bold)\n'
+            '  title   11-23px → var(--typo-title-{size}-bold/semibold)\n'
+            '  headline 24-37px→ var(--typo-headline-{size}-bold/semibold/light/regular)\n'
+            '  display 41-56px → var(--typo-display-{size}-bold/semibold/regular/light)\n'
+            '  label   small(11)/medium(13)/large(14) → var(--typo-label-{size}-regular/bold)\n\n'
             '【올바른 방식】\n'
-            '  - MUI sx prop: sx={{ ...theme.typography.body2 }}\n'
-            '  - 또는: import { typography } from \'@/shared/theme\';\n'
-            '    sx={{ ...typography.body2 }}\n\n'
-            '【주요 타이포그래피 토큰】\n'
-            '  typography.h1 / h2 / h3 / h4 / h5 / h6\n'
-            '  typography.subtitle1 / subtitle2\n'
-            '  typography.body1 / body2\n'
-            '  typography.caption / overline / button'
+            '  /* CSS */\n'
+            '  font: var(--typo-body-13-regular);\n\n'
+            '  /* MUI Typography 컴포넌트 */\n'
+            '  <Typography className="typo-body-13-regular">텍스트</Typography>'
         ),
         '색상': (
             '【위반 기준】 색상 코드(#hex, rgb(), rgba())를 코드에 직접 입력하는 것은\n'
@@ -405,9 +411,14 @@ def suggest_fix():
 
 CATEGORY_GUIDELINES = {
     '타이포그래피': (
-        '【위반】 fontSize/fontWeight/lineHeight 값을 숫자로 직접 입력. '
-        '【수정】 HMG 디자인 시스템 타이포그래피 토큰 사용: '
-        'import { typography } from \'@/shared/theme\'; → sx={{ ...typography.body2 }}'
+        '【위반】 font-size/font-weight/line-height/font-family 값을 직접 입력. '
+        '【수정】 HAE Design System --typo-* CSS 커스텀 프로퍼티 사용. '
+        '허용 크기(px): 11 12 13 14 15 16 17 18 19 20 21 23 24 25 29 32 36 37 41 45 48 56. '
+        '허용 굵기: 300(light)/400(regular)/600(semibold)/700(bold). '
+        '공식 폰트: Asta Sans → var(--typo-font-family-asta-sans). '
+        '토큰 예: var(--typo-body-13-regular) / var(--typo-title-15-bold) / '
+        'var(--typo-headline-24-bold) / var(--typo-display-41-bold). '
+        'MUI: <Typography className="typo-body-13-regular">'
     ),
     '색상': (
         '【위반】 #hex 색상 코드를 직접 입력. '
@@ -946,7 +957,13 @@ def ai_full_review_stream():
      배경: var(--color-light-background-white) / var(--color-light-surface-neutral)
      구분선: var(--color-light-divider-neutral-weaker)
      테두리: var(--color-light-border-neutral)
-2. 타이포그래피: font-size/font-weight/line-height 하드코딩 금지 → theme.typography.body1 등 MUI 토큰
+2. 타이포그래피: font-size/font-weight/line-height/font-family 하드코딩 금지
+   → HAE Design System --typo-* CSS 커스텀 프로퍼티 사용
+   허용 크기(px): 11 12 13 14 15 16 17 18 19 20 21 23 24 25 29 32 36 37 41 45 48 56
+   허용 굵기: 300(light)/400(regular)/600(semibold)/700(bold)
+   공식 폰트: Asta Sans → var(--typo-font-family-asta-sans)
+   토큰 예: font: var(--typo-body-13-regular);  font: var(--typo-headline-24-bold);
+   MUI: <Typography className="typo-title-15-bold">
 3. !important 남용: 한 줄에 2개 이상 또는 불필요한 반복 사용
 4. 스크롤바: ::-webkit-scrollbar 커스터마이징 지양 (크로스브라우저 미지원)
 5. Gradient 하드코딩: linear-gradient/radial-gradient 직접 사용 금지
@@ -1101,7 +1118,11 @@ def ai_deep_review():
 - HAE Design System color 토큰 미사용 (#hex 직접 사용 → var(--color-common-gray-10) 등 CSS 커스텀 프로퍼티로 교체)
   * 알려진 매핑: #131416→var(--color-common-gray-10), #002c5f→var(--color-hyundai-primary-25), #0056ff→var(--color-common-blue-50)
   * 매핑 없는 색상 → HAE Design System 시멘틱 토큰(--color-light-text-*, --color-light-surface-* 등) 사용 권고
-- MUI theme.typography 미사용 (font-size/font-weight/line-height 하드코딩)
+- HAE Design System --typo-* 타이포 토큰 미사용 (font-size/font-weight/line-height/font-family 하드코딩)
+  * 허용 크기(px): 11 12 13 14 15 16 17 18 19 20 21 23 24 25 29 32 36 37 41 45 48 56
+  * 허용 굵기: 300(light)/400(regular)/600(semibold)/700(bold) ← 500·800·900 사용 불가
+  * 공식 폰트: Asta Sans → var(--typo-font-family-asta-sans), 타 폰트(Arial/Noto Sans 등) 금지
+  * 올바른 예: font: var(--typo-body-13-regular); 또는 className="typo-title-15-bold"
 - outline: none / outline: 0 (키보드 접근성 파괴)
 - z-index 매직넘버 100 이상 직접 사용 (→ theme.zIndex 토큰)
 - console.log / debugger 잔류 (배포 코드)
