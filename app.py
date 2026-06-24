@@ -7,6 +7,7 @@ import re
 import json
 import shutil
 import subprocess
+import traceback
 import zipfile
 import tempfile
 from datetime import datetime
@@ -19,7 +20,7 @@ from openpyxl.utils import get_column_letter
 from src.reviewer import Reviewer
 
 app = Flask(__name__)
-app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 최대 500MB
+app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 최대 200MB
 
 
 @app.route('/')
@@ -44,7 +45,7 @@ def review():
     # 선택된 규칙
     selected_rules = request.form.getlist('rules')
     if not selected_rules:
-        selected_rules = ['typography', 'color', 'important', 'scrollbar']
+        selected_rules = ['typography', 'color', 'important', 'scrollbar', 'gradient', 'style_mixing']
 
     # 임시 폴더에 저장 후 검수
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -57,7 +58,10 @@ def review():
             return jsonify(report)
         except zipfile.BadZipFile:
             return jsonify({'error': '올바른 ZIP 파일이 아닙니다'}), 400
+        except MemoryError:
+            return jsonify({'error': 'ZIP 파일이 너무 큽니다. node_modules·dist·build 폴더를 제외하고 소스 코드만 압축해주세요.'}), 400
         except Exception as e:
+            traceback.print_exc()
             return jsonify({'error': f'검수 중 오류 발생: {str(e)}'}), 500
 
 
@@ -164,58 +168,124 @@ def suggest_fix():
         code_lines.append(f"{file_label}{line_label}{o.get('code', '')}")
     code_block = '\n'.join(code_lines) if code_lines else '(코드 정보 없음)'
 
-    # 카테고리별 가이드라인 컨텍스트
+    # 카테고리별 가이드라인 컨텍스트 (HMG 매핑 포함, 단호한 어조)
     guidelines = {
         '타이포그래피': (
-            '현대오토에버 VCP 가이드라인: fontSize/fontWeight/lineHeight 등 타이포그래피 값은 '
-            '코드에 직접 숫자로 입력하지 않고 HMG 디자인 시스템의 타이포그래피 토큰(예: typography.body2, '
-            'typography.h3 등)을 사용해야 합니다. MUI sx prop 사용 시 theme.typography를 참조하세요.'
+            '【위반 기준】 fontSize / fontWeight / lineHeight 등의 값을 숫자로 직접 입력하는 것은\n'
+            '현대오토에버 VCP 코드 가이드라인 위반입니다. 반드시 HMG 디자인 시스템 토큰을 사용해야 합니다.\n\n'
+            '【올바른 방식】\n'
+            '  - MUI sx prop: sx={{ ...theme.typography.body2 }}\n'
+            '  - 또는: import { typography } from \'@/shared/theme\';\n'
+            '    sx={{ ...typography.body2 }}\n\n'
+            '【주요 타이포그래피 토큰】\n'
+            '  typography.h1 / h2 / h3 / h4 / h5 / h6\n'
+            '  typography.subtitle1 / subtitle2\n'
+            '  typography.body1 / body2\n'
+            '  typography.caption / overline / button'
         ),
         '색상': (
-            '현대오토에버 VCP 가이드라인: 색상 코드(#hex)를 직접 입력하지 않고 '
-            'HMG Design System의 색상 변수(예: colors.gray900, colors.primary)를 사용해야 합니다. '
-            "import { colors } from '@/shared/theme'; 형태로 가져와 사용하세요."
+            '【위반 기준】 색상 코드(#hex, rgb(), rgba())를 코드에 직접 입력하는 것은\n'
+            '현대오토에버 VCP 코드 가이드라인 위반입니다. 반드시 HMG Design System 색상 변수를 사용해야 합니다.\n\n'
+            '【올바른 방식】\n'
+            '  import { colors } from \'@/shared/theme\';\n'
+            '  sx={{ color: colors.gray900, backgroundColor: colors.white }}\n\n'
+            '【HMG 색상 변수 매핑표 - 반드시 이 변수명을 사용할 것】\n'
+            '  #000000          → colors.black\n'
+            '  #111111          → colors.gray900\n'
+            '  #333333          → colors.gray800\n'
+            '  #666666          → colors.gray600\n'
+            '  #999999          → colors.gray400\n'
+            '  #cccccc, #CCCCCC → colors.gray200\n'
+            '  #e9eaec, #E9EAEC → colors.gray100\n'
+            '  #ffffff, #FFFFFF → colors.white\n'
+            '  #8333e6, #8333E6 → colors.purple500 (또는 colors.primary)\n'
+            '  위 목록에 없는 색상 → 프로젝트 내 색상 상수 파일에 정의 후 참조'
         ),
         '!important': (
-            '현대오토에버 VCP 가이드라인: CSS !important 사용을 최소화해야 합니다. '
-            'CSS 선택자 명시도(specificity)를 높이거나 MUI sx prop의 우선순위 조정을 통해 '
-            '!important 없이 스타일을 적용하세요.'
+            '【위반 기준】 CSS !important 남용은 현대오토에버 VCP 코드 가이드라인 위반입니다.\n'
+            '한 줄에 !important를 2개 이상 쓰는 것은 즉시 수정이 필요한 심각한 문제입니다.\n\n'
+            '【올바른 방식】\n'
+            '  방법1. CSS 선택자 명시도(specificity) 높이기:\n'
+            '    .parent .child .target { color: red; }  /* !important 없이 */\n'
+            '  방법2. MUI sx prop 우선순위 활용:\n'
+            '    sx={{ \'& .MuiButton-root\': { color: colors.primary } }}\n'
+            '  방법3. 꼭 필요한 경우 1개로 제한, 한 줄에 여러 !important 절대 금지'
         ),
         '스크롤바': (
-            '현대오토에버 VCP 가이드라인: ::-webkit-scrollbar 는 Chrome/Safari에서만 동작합니다. '
-            'Firefox 등 다른 브라우저 대응을 위해 scrollbar-width: thin; scrollbar-color: ... 표준 속성을 함께 작성하거나, '
-            '@/shared/theme의 scrollbarSx 유틸리티를 재사용하세요.'
+            '【위반 기준】 ::-webkit-scrollbar 만 단독 사용 시 Firefox, 일부 Edge에서 동작하지 않습니다.\n'
+            '현대오토에버 VCP 코드 가이드라인: 반드시 브라우저 호환 스타일을 함께 작성해야 합니다.\n\n'
+            '【올바른 방식】\n'
+            '  방법1. 표준 속성 병행 작성 (두 방식 모두 작성):\n'
+            '    /* 표준 (Firefox, 최신 브라우저) */\n'
+            '    scrollbar-width: thin;\n'
+            '    scrollbar-color: #888888 transparent;\n'
+            '    /* Webkit (Chrome, Safari) */\n'
+            '    &::-webkit-scrollbar { width: 6px; }\n'
+            '    &::-webkit-scrollbar-thumb { background: #888888; }\n'
+            '  방법2. @/shared/theme의 scrollbarSx 유틸리티 재사용:\n'
+            '    import { scrollbarSx } from \'@/shared/theme\';\n'
+            '    sx={{ ...scrollbarSx }}'
+        ),
+        '그라데이션': (
+            '【위반 기준】 linear-gradient, radial-gradient 값을 직접 하드코딩하는 것은\n'
+            '현대오토에버 VCP 코드 가이드라인 위반입니다. 동일한 그라데이션이 여러 곳에 반복되면 안 됩니다.\n\n'
+            '【올바른 방식】\n'
+            '  방법1. 프로젝트 공통 constants/theme에 정의 후 참조:\n'
+            '    // constants/gradients.ts\n'
+            '    export const GRADIENT_MAIN = \'linear-gradient(135deg, #8333e6 0%, #111111 100%)\';\n'
+            '    // 사용처\n'
+            '    import { GRADIENT_MAIN } from \'@/shared/constants/gradients\';\n'
+            '    sx={{ background: GRADIENT_MAIN }}\n'
+            '  방법2. CSS 변수로 정의:\n'
+            '    --gradient-primary: linear-gradient(...);\n'
+            '    background: var(--gradient-primary);'
+        ),
+        '스타일링 통일': (
+            '【위반 기준】 MUI sx prop과 인라인 style={{}}, makeStyles/withStyles가 혼용되면\n'
+            '현대오토에버 VCP 코드 가이드라인 위반입니다.\n\n'
+            '【올바른 방식 - MUI v5 표준】\n'
+            '  방법1. sx prop:\n'
+            '    <Box sx={{ color: colors.gray900, fontSize: 14 }} />\n'
+            '  방법2. styled() 컴포넌트:\n'
+            '    const StyledBox = styled(Box)(({ theme }) => ({\n'
+            '      color: theme.palette.primary.main,\n'
+            '    }));\n\n'
+            '  makeStyles/withStyles는 MUI v4 방식으로 v5에서 deprecated.\n'
+            '  인라인 style={{}} 은 동적 값이 꼭 필요한 경우에만 최소한으로 사용.'
         ),
     }
     guideline = guidelines.get(category, '현대오토에버 VCP 퍼블리싱 코드 가이드라인을 준수하세요.')
 
-    prompt = f"""당신은 VCP(Vehicle Content Platform) 퍼블리싱 코드 리뷰 전문가입니다.
-아래 코드의 구체적인 수정 방법을 작성해주세요.
+    prompt = f"""당신은 현대오토에버 VCP 퍼블리싱 코드 검수 전문가입니다.
+아래 코드에서 기준 위반 사항을 발견했습니다. 명확하고 단호하게 수정 방법을 안내해주세요.
 
-【가이드라인】
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 {guideline}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 【문제 분류】 {category}
 【파일】 {file_path}
 【문제 설명】 {description}
 【문제 이유】 {reason}
 
-【발견된 실제 코드】
+【발견된 실제 코드 (이 코드를 기반으로 수정 예시 작성)】
 {code_block}
 
-다음 형식으로 답변해주세요 (마크다운 없이 plain text):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+다음 형식으로 답변해주세요 (마크다운 코드블록 없이 plain text):
 
 ■ 무엇이 문제인가
-(1-2줄로 간결하게)
+위 실제 코드에서 발견된 구체적인 위반 내용. "이 코드의 OOO은 위반입니다"처럼 직접적으로. (2-3줄)
 
 ■ 수정 전
-(위 코드에서 가장 대표적인 예시 1-2줄)
+위의 발견된 실제 코드에서 대표적인 1-3줄을 그대로 인용. (새로 만들지 말 것)
 
 ■ 수정 후
-(실제로 이렇게 고치면 된다는 구체적인 코드 예시)
+위 코드를 가이드라인의 올바른 방식으로 직접 수정한 실제 코드.
+색상의 경우 반드시 위 매핑표의 변수명 사용. 임의로 변수명을 만들지 말 것.
 
 ■ 참고사항
-(추가로 알아야 할 것이 있으면 1-2줄, 없으면 생략)"""
+추가 주의사항이 있으면 1-2줄. 없으면 이 항목 자체를 쓰지 말 것."""
 
     text = _call_claude(prompt)
     if not text:
@@ -226,20 +296,33 @@ def suggest_fix():
 
 CATEGORY_GUIDELINES = {
     '타이포그래피': (
-        'fontSize/fontWeight/lineHeight 값을 코드에 직접 입력하지 않고 '
-        'HMG 디자인 시스템 타이포그래피 토큰(typography.body2, typography.h3 등)을 사용해야 합니다.'
+        '【위반】 fontSize/fontWeight/lineHeight 값을 숫자로 직접 입력. '
+        '【수정】 HMG 디자인 시스템 타이포그래피 토큰 사용: '
+        'import { typography } from \'@/shared/theme\'; → sx={{ ...typography.body2 }}'
     ),
     '색상': (
-        '색상 코드(#hex)를 직접 입력하지 않고 HMG Design System 색상 변수'
-        "(colors.gray900, colors.primary 등, import { colors } from '@/shared/theme')를 사용해야 합니다."
+        '【위반】 #hex 색상 코드를 직접 입력. '
+        '【수정】 HMG Design System 색상 변수 사용: '
+        'import { colors } from \'@/shared/theme\'; → sx={{ color: colors.gray900 }}. '
+        '매핑: #111111→gray900, #333333→gray800, #666666→gray600, '
+        '#999999→gray400, #cccccc→gray200, #ffffff→white, #8333e6→purple500(primary)'
     ),
     '!important': (
-        'CSS !important 사용을 최소화해야 합니다. CSS 선택자 명시도(specificity) 조정 또는 '
-        'MUI sx prop 우선순위 조정으로 !important 없이 스타일을 적용하세요.'
+        '【위반】 CSS !important 과다 사용. 한 줄에 2개 이상은 즉시 수정 필요. '
+        '【수정】 CSS 선택자 명시도(specificity) 높이기 또는 MUI sx prop 우선순위 조정으로 제거.'
     ),
     '스크롤바': (
-        '::-webkit-scrollbar 는 Chrome/Safari 전용입니다. Firefox 등 대응을 위해 '
-        'scrollbar-width/scrollbar-color 표준 속성을 함께 작성하거나 scrollbarSx 유틸을 재사용하세요.'
+        '【위반】 ::-webkit-scrollbar 단독 사용 (Chrome/Safari 전용). '
+        '【수정】 scrollbar-width: thin; scrollbar-color: ... 표준 속성 병행 작성 '
+        '또는 @/shared/theme의 scrollbarSx 유틸리티 재사용.'
+    ),
+    '그라데이션': (
+        '【위반】 linear-gradient/radial-gradient 값을 직접 하드코딩. '
+        '【수정】 HMG 디자인 시스템 그라데이션 변수 또는 프로젝트 공통 constants에 정의 후 참조.'
+    ),
+    '스타일링 통일': (
+        '【위반】 MUI sx prop과 인라인 style={{}}, makeStyles/withStyles 혼용. '
+        '【수정】 MUI v5 표준인 sx prop 또는 styled() 컴포넌트로 통일.'
     ),
 }
 

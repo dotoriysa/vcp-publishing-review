@@ -3,32 +3,45 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>퍼블리싱 코드 자동 검수 도구</title>
+    <title>VCP 퍼블리싱 검수 시스템 | INNOCEAN</title>
     <link rel="stylesheet" href="/static/css/main.css">
 </head>
 <body>
+    <!-- 상단 헤더 바 -->
+    <div class="top-bar">
+        <div class="top-bar-inner">
+            <span class="top-bar-title">VCP 퍼블리싱 검수 시스템</span>
+        </div>
+    </div>
+
     <div class="container">
         <header class="header">
-            <h1>🔍 퍼블리싱 코드 자동 검수</h1>
-            <p class="subtitle">VCP 퍼블리싱 코드의 품질을 자동으로 검사합니다</p>
+            <h1>퍼블리싱 코드 자동 검수</h1>
+            <p class="subtitle">VCP 퍼블리싱 코드의 품질을 자동으로 분석하고 검수 리포트를 생성합니다</p>
         </header>
 
         <main class="main">
             <!-- 파일 업로드 영역 -->
             <section class="upload-section">
                 <div class="upload-box" id="dropZone">
-                    <div class="upload-icon">📦</div>
+                    <div class="upload-icon">
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                    </div>
                     <p class="upload-text">ZIP 파일을 여기에 끌어다 놓으세요</p>
                     <p class="upload-sub">또는</p>
                     <label class="upload-btn" for="fileInput">
-                        파일 선택하기
+                        파일 선택
                     </label>
                     <input type="file" id="fileInput" accept=".zip" hidden>
-                    <p class="upload-hint">퍼블리싱 코드가 담긴 ZIP 파일만 가능합니다</p>
+                    <p class="upload-hint">퍼블리싱 코드가 담긴 ZIP 파일만 지원됩니다</p>
                 </div>
 
                 <div class="file-info hidden" id="fileInfo">
-                    <span class="file-icon">📄</span>
+                    <span class="file-icon-text">ZIP</span>
                     <span class="file-name" id="fileName"></span>
                     <button class="file-remove" id="fileRemove">✕</button>
                 </div>
@@ -37,20 +50,18 @@
             <!-- 검수 기준 선택 -->
             <section class="rules-section">
                 <h2>검수 기준 선택</h2>
-                <p class="rules-desc">검사할 항목을 선택하세요 (기본: 전체 선택)</p>
+                <p class="rules-desc">검사할 항목을 선택하세요 (기본값: 전체 선택)</p>
                 <div class="rules-grid">
                     <label class="rule-item">
                         <input type="checkbox" name="rules" value="typography" checked>
                         <div class="rule-content">
-                            <span class="rule-icon">🔤</span>
                             <span class="rule-name">타이포그래피</span>
-                            <span class="rule-desc">폰트 크기/굵기/줄간격 직접 입력 여부</span>
+                            <span class="rule-desc">폰트 크기·굵기·줄간격 직접 입력 여부</span>
                         </div>
                     </label>
                     <label class="rule-item">
                         <input type="checkbox" name="rules" value="color" checked>
                         <div class="rule-content">
-                            <span class="rule-icon">🎨</span>
                             <span class="rule-name">색상</span>
                             <span class="rule-desc">하드코딩된 색상 코드 중복 여부</span>
                         </div>
@@ -58,7 +69,6 @@
                     <label class="rule-item">
                         <input type="checkbox" name="rules" value="important" checked>
                         <div class="rule-content">
-                            <span class="rule-icon">⚠️</span>
                             <span class="rule-name">!important</span>
                             <span class="rule-desc">CSS !important 과다 사용 여부</span>
                         </div>
@@ -66,9 +76,22 @@
                     <label class="rule-item">
                         <input type="checkbox" name="rules" value="scrollbar" checked>
                         <div class="rule-content">
-                            <span class="rule-icon">📜</span>
                             <span class="rule-name">스크롤바</span>
                             <span class="rule-desc">브라우저 호환성 없는 스크롤바 스타일</span>
+                        </div>
+                    </label>
+                    <label class="rule-item">
+                        <input type="checkbox" name="rules" value="gradient" checked>
+                        <div class="rule-content">
+                            <span class="rule-name">그라데이션</span>
+                            <span class="rule-desc">그라데이션 값 직접 하드코딩 여부</span>
+                        </div>
+                    </label>
+                    <label class="rule-item">
+                        <input type="checkbox" name="rules" value="style_mixing" checked>
+                        <div class="rule-content">
+                            <span class="rule-name">스타일링 통일</span>
+                            <span class="rule-desc">인라인 스타일·sx prop 혼용, deprecated makeStyles</span>
                         </div>
                     </label>
                 </div>
@@ -77,13 +100,13 @@
             <!-- 검수 시작 버튼 -->
             <section class="action-section">
                 <button class="start-btn" id="startBtn" disabled>
-                    검수 시작하기
+                    검수 시작
                 </button>
             </section>
 
             <!-- 진행 상황 -->
             <section class="progress-section hidden" id="progressSection">
-                <h2>검수 진행 중...</h2>
+                <h2>검수 진행 중</h2>
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
@@ -92,12 +115,12 @@
 
             <!-- 결과 요약 -->
             <section class="result-section hidden" id="resultSection">
-                <h2>📊 검수 결과</h2>
+                <h2>검수 결과</h2>
                 <div class="summary-cards" id="summaryCards"></div>
 
                 <!-- AI 분석 섹션 -->
                 <div class="ai-section" id="aiSection">
-                    <div class="ai-section-header">✦ AI 코드 리뷰</div>
+                    <div class="ai-section-header">AI 코드 리뷰</div>
                     <div class="ai-body" id="aiBody">
                         <div class="ai-loading">
                             <span class="ai-spinner"></span> Claude가 코드를 분석하고 있습니다...

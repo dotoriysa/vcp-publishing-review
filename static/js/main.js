@@ -197,7 +197,7 @@ async function fetchAiSummary(data) {
         aiBody.innerHTML = `
             <div class="ai-overall">${s.overall || ''}</div>
             ${bulletsHtml}
-            ${s.action ? `<div class="ai-action"><strong>📋 조치 요청:</strong> ${s.action}</div>` : ''}
+            ${s.action ? `<div class="ai-action"><strong>조치 요청:</strong> ${s.action}</div>` : ''}
         `;
     } catch {
         aiBody.innerHTML = `<div class="ai-error">AI 분석 중 오류가 발생했습니다.</div>`;
@@ -212,11 +212,11 @@ function renderSummary(summary) {
         </div>
         <div class="summary-card critical">
             <div class="summary-count">${summary.critical}</div>
-            <div class="summary-label">🔴 심각한 문제</div>
+            <div class="summary-label">심각한 문제</div>
         </div>
         <div class="summary-card warning">
             <div class="summary-count">${summary.warnings}</div>
-            <div class="summary-label">🟡 주의 사항</div>
+            <div class="summary-label">주의 사항</div>
         </div>
     `;
 }
@@ -233,8 +233,8 @@ function renderFilterBar(issues) {
     document.getElementById('filterGroups').innerHTML = `
         <span class="filter-label">심각도</span>
         <button class="filter-btn active" data-sev="all" onclick="setSeverity('all', this)">전체 ${issues.length}</button>
-        <button class="filter-btn" data-sev="critical" onclick="setSeverity('critical', this)">🔴 심각 ${criticalCount}</button>
-        <button class="filter-btn" data-sev="warning" onclick="setSeverity('warning', this)">🟡 주의 ${warningCount}</button>
+        <button class="filter-btn" data-sev="critical" onclick="setSeverity('critical', this)">수정 필수 ${criticalCount}</button>
+        <button class="filter-btn" data-sev="warning" onclick="setSeverity('warning', this)">개선 권고 ${warningCount}</button>
         <div class="filter-divider"></div>
         <span class="filter-label">카테고리</span>
         <button class="filter-btn active" data-cat="all" onclick="setCategory('all', this)">전체</button>
@@ -368,8 +368,8 @@ function renderByFile(issues) {
 
         const badgeClass = hasCritical ? 'has-critical' : 'only-warning';
         const badgeText = hasCritical
-            ? `🔴 ${critCount}건${warnCount ? ` · 🟡 ${warnCount}건` : ''}`
-            : `🟡 ${warnCount}건`;
+            ? `심각 ${critCount}건${warnCount ? ` · 주의 ${warnCount}건` : ''}`
+            : `주의 ${warnCount}건`;
 
         const groupId = 'fg-' + file.replace(/[^a-zA-Z0-9]/g, '_');
 
@@ -398,7 +398,6 @@ function renderByFile(issues) {
         return `
         <div class="file-group">
             <div class="file-group-header" onclick="toggleFileGroup('${groupId}')">
-                <span style="font-size:16px">📄</span>
                 <span class="file-group-name">${file}</span>
                 <span class="file-group-badge ${badgeClass}">${badgeText}</span>
                 <span class="file-group-arrow open" id="arrow-${groupId}">▼</span>
@@ -472,7 +471,7 @@ async function loadFixSuggestion(event, idx) {
 
     if (!issue) return;
 
-    block.innerHTML = `<div class="fix-loading"><span class="ai-spinner" style="border-color:rgba(131,51,230,.2);border-top-color:#8333e6"></span> Claude가 수정 방법을 작성하고 있습니다...</div>`;
+    block.innerHTML = `<div class="fix-loading"><span class="ai-spinner" style="border-color:rgba(15,42,94,.2);border-top-color:#0f2a5e"></span> Claude가 수정 방법을 작성하고 있습니다...</div>`;
 
     try {
         const res = await fetch('/api/suggest-fix', {
@@ -492,11 +491,49 @@ async function loadFixSuggestion(event, idx) {
         block.innerHTML = `
             <div class="fix-suggestion">
                 <div class="fix-suggestion-label">AI 수정 제안</div>
-                <pre class="fix-suggestion-text">${escapeHtml(data.suggestion)}</pre>
+                ${renderFixSections(data.suggestion)}
             </div>`;
     } catch (e) {
         block.innerHTML = `<div class="fix-error">수정 제안 생성 실패: ${e.message}</div>`;
     }
+}
+
+// ■ 섹션별로 파싱해 수정 전/후를 색상 구분하여 렌더링
+function renderFixSections(text) {
+    if (!text) return '';
+
+    // ■ 기호 기준으로 섹션 분리
+    const rawParts = text.split(/(?=■)/);
+    let html = '<div class="fix-sections">';
+
+    for (const part of rawParts) {
+        const trimmed = part.trim();
+        if (!trimmed) continue;
+
+        const headerMatch = trimmed.match(/^■\s*(.+?)(?:\n|$)/);
+        if (!headerMatch) {
+            html += `<div class="fix-sec fix-sec-default"><pre class="fix-sec-body">${escapeHtml(trimmed)}</pre></div>`;
+            continue;
+        }
+
+        const header = headerMatch[1].trim();
+        const body = trimmed.slice(headerMatch[0].length).trim();
+
+        let cls = 'fix-sec-default';
+        if (/수정\s*전/.test(header)) cls = 'fix-sec-before';
+        else if (/수정\s*후/.test(header)) cls = 'fix-sec-after';
+        else if (/문제|위반/.test(header)) cls = 'fix-sec-problem';
+        else if (/참고/.test(header)) cls = 'fix-sec-note';
+
+        html += `
+            <div class="fix-sec ${cls}">
+                <div class="fix-sec-header">■ ${escapeHtml(header)}</div>
+                ${body ? `<pre class="fix-sec-body">${escapeHtml(body)}</pre>` : ''}
+            </div>`;
+    }
+
+    html += '</div>';
+    return html;
 }
 
 // occurrences 렌더링 (줄번호 + 코드 + 말줄임표)
@@ -512,7 +549,7 @@ function renderOccurrences(occurrences, uid) {
 
     function lineHtml(o) {
         const fileTag = (isMultiFile && o.file)
-            ? `<div class="code-line-file">📁 ${escapeHtml(o.file)}</div>`
+            ? `<div class="code-line-file">${escapeHtml(o.file)}</div>`
             : '';
         return `${fileTag}<li class="code-line">
             <span class="code-line-num">${o.line || ''}</span>

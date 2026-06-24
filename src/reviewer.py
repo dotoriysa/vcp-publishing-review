@@ -9,6 +9,8 @@ from src.rules.typography_rule import TypographyRule
 from src.rules.color_rule import ColorRule
 from src.rules.important_rule import ImportantRule
 from src.rules.scrollbar_rule import ScrollbarRule
+from src.rules.gradient_rule import GradientRule
+from src.rules.style_mixing_rule import StyleMixingRule
 
 
 SUPPORTED_EXTENSIONS = {'.tsx', '.ts', '.jsx', '.js', '.css', '.scss', '.html'}
@@ -18,6 +20,8 @@ RULE_MAP = {
     'color': ColorRule,
     'important': ImportantRule,
     'scrollbar': ScrollbarRule,
+    'gradient': GradientRule,
+    'style_mixing': StyleMixingRule,
 }
 
 
@@ -61,6 +65,8 @@ class Reviewer:
                         pass
         return files
 
+    MAX_OCCURRENCES_PER_ISSUE = 300  # 이슈당 최대 저장 건수 (메모리 보호)
+
     def _build_report(
         self, files: Dict[str, str], issues: List[Dict]
     ) -> Dict[str, Any]:
@@ -73,6 +79,12 @@ class Reviewer:
         for issue in issues:
             cat = issue.get('category', '기타')
             category_counts[cat] = category_counts.get(cat, 0) + 1
+
+        # occurrences 과다 적재 방지 (대용량 ZIP에서 MemoryError 예방)
+        for issue in issues:
+            occs = issue.get('occurrences', [])
+            if len(occs) > self.MAX_OCCURRENCES_PER_ISSUE:
+                issue['occurrences'] = occs[:self.MAX_OCCURRENCES_PER_ISSUE]
 
         return {
             'summary': {
