@@ -59,7 +59,12 @@
             <!-- 검수 기준 선택 -->
             <section class="rules-section">
                 <h2>검수 기준 선택</h2>
-                <p class="rules-desc">검사할 항목을 선택하세요 (기본값: 전체 선택)</p>
+
+                <!-- 필수 기준 (메일 기반) -->
+                <div class="rules-group-header">
+                    <span class="rules-group-badge required-badge">필수</span>
+                    <span class="rules-group-title">오토에버 메일 기준</span>
+                </div>
                 <div class="rules-grid">
                     <label class="rule-item">
                         <input type="checkbox" name="rules" value="typography" checked>
@@ -103,46 +108,56 @@
                             <span class="rule-desc">인라인 스타일·sx prop 혼용, deprecated makeStyles</span>
                         </div>
                     </label>
-                    <label class="rule-item">
-                        <input type="checkbox" name="rules" value="console_log" checked>
-                        <div class="rule-content">
-                            <span class="rule-name">console.log 미제거</span>
-                            <span class="rule-desc">배포 코드 내 console.log·debugger 잔류 여부</span>
-                        </div>
-                    </label>
-                    <label class="rule-item">
-                        <input type="checkbox" name="rules" value="zindex" checked>
-                        <div class="rule-content">
-                            <span class="rule-name">z-index 매직넘버</span>
-                            <span class="rule-desc">z-index 임의 큰 숫자(100↑) 직접 사용 여부</span>
-                        </div>
-                    </label>
-                    <label class="rule-item">
-                        <input type="checkbox" name="rules" value="accessibility" checked>
-                        <div class="rule-content">
-                            <span class="rule-name">접근성(a11y)</span>
-                            <span class="rule-desc">outline:none 제거·img alt 누락·button type 누락</span>
-                        </div>
-                    </label>
+                </div>
+
+                <!-- 추가 선택 기준 -->
+                <div class="extra-section">
+                    <div class="rules-group-header">
+                        <span class="rules-group-badge extra-badge">추가</span>
+                        <span class="rules-group-title">코드 품질 기준 <span class="rules-group-opt">(선택)</span></span>
+                    </div>
+                    <div class="rules-grid">
+                        <label class="rule-item extra-rule-item">
+                            <input type="checkbox" name="rules" value="console_log">
+                            <div class="rule-content">
+                                <span class="rule-name">console.log 미제거</span>
+                                <span class="rule-desc">배포 코드 내 console.log·debugger 잔류 여부</span>
+                            </div>
+                        </label>
+                        <label class="rule-item extra-rule-item">
+                            <input type="checkbox" name="rules" value="zindex">
+                            <div class="rule-content">
+                                <span class="rule-name">z-index 매직넘버</span>
+                                <span class="rule-desc">z-index 임의 큰 숫자(100↑) 직접 사용 여부</span>
+                            </div>
+                        </label>
+                        <label class="rule-item extra-rule-item">
+                            <input type="checkbox" name="rules" value="accessibility">
+                            <div class="rule-content">
+                                <span class="rule-name">접근성(a11y)</span>
+                                <span class="rule-desc">outline:none 제거·img alt 누락·button type 누락</span>
+                            </div>
+                        </label>
+                    </div>
                 </div>
 
                 <!-- HAE Design System 선택 기준 -->
                 <div class="hae-section">
-                    <div class="hae-section-header">
-                        <span class="hae-badge">HAE Design System</span>
-                        <span class="hae-section-title">디자인 토큰 기준 추가 적용 <span class="hae-optional">(선택)</span></span>
+                    <div class="rules-group-header">
+                        <span class="rules-group-badge hae-badge">HAE DS</span>
+                        <span class="rules-group-title">HAE Design System 토큰 기준 <span class="rules-group-opt">(선택)</span></span>
                     </div>
-                    <p class="hae-section-desc">현대오토에버 HAE Design System 스타일 가이드 파일 기준으로 추가 검수합니다. 일반 오토에버 기준보다 엄격하게 검사합니다.</p>
+                    <p class="hae-section-desc">HAE Design System 스타일 가이드 파일 기준으로 추가 검수합니다. 오토에버 기준보다 엄격하게 검사합니다.</p>
                     <div class="rules-grid hae-rules-grid">
                         <label class="rule-item hae-rule-item">
-                            <input type="checkbox" name="rules" value="hae_color" id="haeColorChk">
+                            <input type="checkbox" name="rules" value="hae_color">
                             <div class="rule-content">
                                 <span class="rule-name">HAE 색상 토큰 검수</span>
                                 <span class="rule-desc">HAE DS 팔레트 기반 색상 토큰(--color-*) 미사용 여부 · 매핑 없는 색상 경고</span>
                             </div>
                         </label>
                         <label class="rule-item hae-rule-item">
-                            <input type="checkbox" name="rules" value="hae_typography" id="haeTypoChk">
+                            <input type="checkbox" name="rules" value="hae_typography">
                             <div class="rule-content">
                                 <span class="rule-name">HAE 타이포그래피 토큰 검수</span>
                                 <span class="rule-desc">HAE DS --typo-* 토큰 미사용 · 비표준 폰트 크기/굵기/패밀리(Asta Sans) 검사</span>

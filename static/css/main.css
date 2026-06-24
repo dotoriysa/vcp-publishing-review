@@ -190,13 +190,7 @@ body {
     font-size: 15px;
     font-weight: 700;
     color: #0f2a5e;
-    margin-bottom: 6px;
-}
-
-.rules-desc {
-    font-size: 13px;
-    color: #5a6a84;
-    margin-bottom: 18px;
+    margin-bottom: 16px;
 }
 
 .rules-grid {
@@ -252,41 +246,85 @@ body {
     line-height: 1.5;
 }
 
-/* HAE Design System 옵션 섹션 */
-.hae-section {
-    margin-top: 22px;
-    padding-top: 20px;
-    border-top: 1px dashed #c5cfe0;
-}
-
-.hae-section-header {
+/* 검수 기준 그룹 공통 헤더 */
+.rules-group-header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    margin-bottom: 8px;
+    gap: 8px;
+    margin-bottom: 12px;
 }
 
-.hae-badge {
+.rules-section > .rules-group-header:first-of-type {
+    margin-top: 4px;
+}
+
+.rules-group-badge {
     display: inline-block;
-    padding: 3px 9px;
-    background: #002c5f;
-    color: #fff;
+    padding: 2px 8px;
     font-size: 11px;
     font-weight: 700;
     border-radius: 4px;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.03em;
 }
 
-.hae-section-title {
+.required-badge {
+    background: #0f2a5e;
+    color: #fff;
+}
+
+.extra-badge {
+    background: #4b6584;
+    color: #fff;
+}
+
+.hae-badge {
+    background: #002c5f;
+    color: #fff;
+}
+
+.rules-group-title {
     font-size: 13px;
     font-weight: 700;
     color: #0d1b34;
 }
 
-.hae-optional {
+.rules-group-opt {
     font-weight: 400;
     color: #5a6a84;
     font-size: 12px;
+}
+
+/* 추가 선택 기준 섹션 */
+.extra-section {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px dashed #c5cfe0;
+}
+
+.extra-rule-item {
+    border-color: #c5cfe0;
+    background: #fafbfd;
+}
+
+.extra-rule-item:hover {
+    border-color: #4b6584;
+    background: #f3f5f9;
+}
+
+.extra-rule-item:has(input:checked) {
+    border-color: #4b6584;
+    background: #edf1f7;
+}
+
+.extra-rule-item input {
+    accent-color: #4b6584;
+}
+
+/* HAE Design System 옵션 섹션 */
+.hae-section {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px dashed #c5cfe0;
 }
 
 .hae-section-desc {
