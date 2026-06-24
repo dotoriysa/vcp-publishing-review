@@ -11,6 +11,9 @@ from src.rules.important_rule import ImportantRule
 from src.rules.scrollbar_rule import ScrollbarRule
 from src.rules.gradient_rule import GradientRule
 from src.rules.style_mixing_rule import StyleMixingRule
+from src.rules.console_log_rule import ConsoleLogRule
+from src.rules.zindex_rule import ZIndexRule
+from src.rules.accessibility_rule import AccessibilityRule
 
 
 SUPPORTED_EXTENSIONS = {'.tsx', '.ts', '.jsx', '.js', '.css', '.scss', '.html'}
@@ -22,6 +25,9 @@ RULE_MAP = {
     'scrollbar': ScrollbarRule,
     'gradient': GradientRule,
     'style_mixing': StyleMixingRule,
+    'console_log': ConsoleLogRule,
+    'zindex': ZIndexRule,
+    'accessibility': AccessibilityRule,
 }
 
 
@@ -41,6 +47,7 @@ class Reviewer:
         """검수 실행"""
         # 1. ZIP 압축 해제
         files = self._extract_zip()
+        self._files = files  # AI 수정 제안 컨텍스트용으로 보관
 
         # 2. 각 규칙 적용
         all_issues = []
@@ -50,6 +57,10 @@ class Reviewer:
 
         # 3. 결과 취합
         return self._build_report(files, all_issues)
+
+    def get_files(self) -> Dict[str, str]:
+        """검수에 사용된 파일 내용 반환 (AI 수정 제안 ±10줄 컨텍스트용)"""
+        return getattr(self, '_files', {})
 
     def _extract_zip(self) -> Dict[str, str]:
         """ZIP 파일에서 소스 파일들을 추출합니다"""

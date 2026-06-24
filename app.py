@@ -22,6 +22,10 @@ from src.reviewer import Reviewer
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 200 * 1024 * 1024  # 최대 200MB
 
+# 가장 최근 검수 파일 내용 보관 (AI 수정 제안 시 컨텍스트 제공용)
+# {filepath: content} — 단일 세션만 유지 (메모리 절약)
+_last_review_files: dict = {}
+
 
 @app.route('/')
 def index():
@@ -45,7 +49,10 @@ def review():
     # 선택된 규칙
     selected_rules = request.form.getlist('rules')
     if not selected_rules:
-        selected_rules = ['typography', 'color', 'important', 'scrollbar', 'gradient', 'style_mixing']
+        selected_rules = [
+            'typography', 'color', 'important', 'scrollbar',
+            'gradient', 'style_mixing', 'console_log', 'zindex', 'accessibility',
+        ]
 
     # 임시 폴더에 저장 후 검수
     with tempfile.TemporaryDirectory() as tmp_dir:
@@ -55,6 +62,11 @@ def review():
         try:
             reviewer = Reviewer(zip_path, selected_rules)
             report = reviewer.run()
+
+            # 파일 내용을 세션에 보관 (AI 수정 제안 컨텍스트용)
+            global _last_review_files
+            _last_review_files = reviewer.get_files()
+
             return jsonify(report)
         except zipfile.BadZipFile:
             return jsonify({'error': '올바른 ZIP 파일이 아닙니다'}), 400
@@ -63,6 +75,21 @@ def review():
         except Exception as e:
             traceback.print_exc()
             return jsonify({'error': f'검수 중 오류 발생: {str(e)}'}), 500
+
+
+def _get_file_context(filepath: str, target_line: int, radius: int = 10) -> str:
+    """저장된 파일에서 target_line 전후 radius줄 컨텍스트를 추출합니다."""
+    content = _last_review_files.get(filepath, '')
+    if not content or target_line <= 0:
+        return ''
+    lines = content.splitlines()
+    start = max(0, target_line - 1 - radius)
+    end = min(len(lines), target_line + radius)
+    result = []
+    for i, line in enumerate(lines[start:end], start=start + 1):
+        marker = '▶' if i == target_line else ' '
+        result.append(f"L.{i:4d} {marker} {line}")
+    return '\n'.join(result)
 
 
 def _find_claude_cli():
@@ -160,13 +187,21 @@ def suggest_fix():
     occurrences = data.get('occurrences', [])   # [{line, code}, ...]
     reason    = data.get('reason', '')
 
-    # 실제 코드 발췌 (최대 15줄)
+    # 발견된 위반 코드 목록 (최대 15줄)
     code_lines = []
     for o in occurrences[:15]:
         file_label = f"[{o['file']}] " if o.get('file') else ''
         line_label = f"L.{o['line']}  " if o.get('line') else ''
         code_lines.append(f"{file_label}{line_label}{o.get('code', '')}")
     code_block = '\n'.join(code_lines) if code_lines else '(코드 정보 없음)'
+
+    # 파일 원문 ±10줄 컨텍스트 (첫 번째 occurrence 기준)
+    first_line = occurrences[0].get('line', 0) if occurrences else 0
+    file_context = _get_file_context(file_path, first_line, radius=10)
+    context_section = (
+        f'\n【파일 원문 컨텍스트 (L.{first_line} 전후 10줄, ▶ 표시가 위반 라인)】\n{file_context}'
+        if file_context else ''
+    )
 
     # 카테고리별 가이드라인 컨텍스트 (HMG 매핑 포함, 단호한 어조)
     guidelines = {
@@ -253,6 +288,45 @@ def suggest_fix():
             '  makeStyles/withStyles는 MUI v4 방식으로 v5에서 deprecated.\n'
             '  인라인 style={{}} 은 동적 값이 꼭 필요한 경우에만 최소한으로 사용.'
         ),
+        'console.log': (
+            '【위반 기준】 console.log, console.error, console.warn, debugger 등이\n'
+            '배포 코드에 잔류하는 것은 현대오토에버 VCP 코드 기준 위반입니다.\n\n'
+            '【조치 방법】\n'
+            '  - console.log 줄 전체를 삭제하세요.\n'
+            '  - 운영 환경 로그가 필요한 경우: 프로젝트 공통 logger 유틸리티 사용\n'
+            '  - debugger는 반드시 삭제. 배포 환경에서 브라우저를 멈추게 합니다.'
+        ),
+        'z-index': (
+            '【위반 기준】 z-index에 999, 9999 같은 임의의 큰 숫자를 직접 입력하면\n'
+            '현대오토에버 VCP 코드 기준 위반입니다.\n\n'
+            '【MUI zIndex 토큰 매핑표 - 반드시 이 토큰을 사용할 것】\n'
+            '  theme.zIndex.mobileStepper = 1000\n'
+            '  theme.zIndex.fab           = 1050\n'
+            '  theme.zIndex.appBar        = 1200\n'
+            '  theme.zIndex.drawer        = 1300\n'
+            '  theme.zIndex.modal         = 1400\n'
+            '  theme.zIndex.snackbar      = 1500\n'
+            '  theme.zIndex.tooltip       = 1600\n\n'
+            '【올바른 방식】\n'
+            '  sx={{ zIndex: theme.zIndex.modal }}\n'
+            '  또는 styled(Box)(({ theme }) => ({ zIndex: theme.zIndex.appBar }))'
+        ),
+        '접근성': (
+            '【위반 기준】 outline: none, img alt 누락, button type 누락은\n'
+            '현대오토에버 VCP 코드 기준 및 WCAG 2.1 접근성 가이드라인 위반입니다.\n\n'
+            '【outline: none 대체 방법】\n'
+            '  /* 키보드 포커스일 때만 보이게 */\n'
+            '  &:focus-visible {\n'
+            '    outline: 2px solid colors.primary;\n'
+            '    outline-offset: 2px;\n'
+            '  }\n\n'
+            '【img alt 필수 작성】\n'
+            '  <img src={src} alt="차량 사이드 뷰 이미지" />  /* 의미있는 이미지 */\n'
+            '  <img src={src} alt="" role="presentation" />   /* 장식용 이미지 */\n\n'
+            '【button type 명시】\n'
+            '  <button type="button">클릭</button>\n'
+            '  <button type="submit">제출</button>'
+        ),
     }
     guideline = guidelines.get(category, '현대오토에버 VCP 퍼블리싱 코드 가이드라인을 준수하세요.')
 
@@ -268,9 +342,9 @@ def suggest_fix():
 【문제 설명】 {description}
 【문제 이유】 {reason}
 
-【발견된 실제 코드 (이 코드를 기반으로 수정 예시 작성)】
+【발견된 위반 코드 목록】
 {code_block}
-
+{context_section}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 다음 형식으로 답변해주세요 (마크다운 코드블록 없이 plain text):
 
@@ -323,6 +397,20 @@ CATEGORY_GUIDELINES = {
     '스타일링 통일': (
         '【위반】 MUI sx prop과 인라인 style={{}}, makeStyles/withStyles 혼용. '
         '【수정】 MUI v5 표준인 sx prop 또는 styled() 컴포넌트로 통일.'
+    ),
+    'console.log': (
+        '【위반】 console.log / debugger 배포 코드 잔류. '
+        '【수정】 해당 줄 완전 삭제. 운영 로그 필요 시 프로젝트 공통 logger 유틸리티 사용.'
+    ),
+    'z-index': (
+        '【위반】 z-index에 임의의 큰 숫자(100 이상) 직접 사용. '
+        '【수정】 MUI theme.zIndex 토큰 사용: '
+        'appBar(1200), drawer(1300), modal(1400), snackbar(1500), tooltip(1600).'
+    ),
+    '접근성': (
+        '【위반】 outline:none으로 키보드 포커스 제거, img alt 누락, button type 누락. '
+        '【수정】 outline: none → :focus-visible 대체; '
+        'img에 alt 속성 필수; button에 type="button"|"submit" 명시.'
     ),
 }
 
@@ -774,6 +862,94 @@ def draft_mail():
         return jsonify({'error': 'Claude CLI를 찾을 수 없습니다'}), 500
 
     return jsonify({'mail': text})
+
+
+@app.route('/api/ai-deep-review', methods=['POST'])
+def ai_deep_review():
+    """이슈 상위 파일을 AI가 직접 읽고 규칙 엔진이 놓친 추가 이슈 발견"""
+    data = request.get_json()
+    issues = data.get('issues', [])
+
+    # 이슈 많은 상위 3개 파일 선택
+    file_issue_count: dict = {}
+    for issue in issues:
+        f = issue.get('file', '')
+        if f:
+            file_issue_count[f] = file_issue_count.get(f, 0) + 1
+
+    top_files = sorted(file_issue_count, key=file_issue_count.get, reverse=True)[:3]  # type: ignore[arg-type]
+
+    # 이슈가 없으면 보관된 파일 중 상위 3개
+    if not top_files:
+        top_files = list(_last_review_files.keys())[:3]
+
+    if not top_files or not _last_review_files:
+        return jsonify({'error': '분석할 파일이 없습니다. 먼저 검수를 실행해주세요.'}), 400
+
+    results = []
+    for filepath in top_files:
+        content = _last_review_files.get(filepath, '')
+        if not content:
+            continue
+
+        # 파일이 너무 길면 앞 150줄만 전달
+        lines = content.splitlines()
+        truncated = len(lines) > 150
+        snippet = '\n'.join(lines[:150]) if truncated else content
+        trunc_note = f'\n(이하 {len(lines) - 150}줄 생략)' if truncated else ''
+
+        prompt = f"""당신은 현대자동차그룹 VCP(Vehicle Content Platform) 퍼블리싱 코드 품질 검수 전문가입니다.
+아래 파일을 직접 읽고, 기존 자동 검수 도구가 놓쳤을 수 있는 추가적인 코드 품질 문제를 찾아주세요.
+
+【파일명】 {filepath}
+【소스코드】
+{snippet}{trunc_note}
+
+【검수 기준 (현대오토에버 VCP 기준)】
+- HMG 디자인 시스템 color 토큰 미사용 (#hex 직접 사용 → colors.gray900 등으로 교체)
+- MUI theme.typography 미사용 (font-size/font-weight/line-height 하드코딩)
+- outline: none / outline: 0 (키보드 접근성 파괴)
+- z-index 매직넘버 100 이상 직접 사용 (→ theme.zIndex 토큰)
+- console.log / debugger 잔류 (배포 코드)
+- !important 남용 (한 줄에 2개 이상 또는 반복적 사용)
+- 인라인 style={{}} 과 sx prop 혼용
+- gradient 하드코딩 (linear-gradient 등)
+- <img> alt 속성 누락
+- <button> type 속성 누락
+- 그 외 VCP 기준 위반이나 명백한 코드 품질 문제
+
+【출력 형식】
+발견된 추가 이슈를 아래 JSON 배열로만 출력하세요 (설명 없이):
+[
+  {{
+    "line": 줄번호(숫자),
+    "severity": "critical" 또는 "warning",
+    "category": "카테고리명",
+    "description": "한 줄 설명",
+    "code": "해당 코드 (한 줄)",
+    "suggestion": "수정 방법 한 줄"
+  }}
+]
+
+이슈가 없으면 빈 배열 []을 출력하세요. JSON 외 다른 텍스트는 절대 출력하지 마세요."""
+
+        text = _call_claude(prompt)
+        if not text:
+            continue
+
+        try:
+            json_match = re.search(r'\[.*\]', text, re.DOTALL)
+            if json_match:
+                found = json.loads(json_match.group())
+                if isinstance(found, list) and found:
+                    results.append({
+                        'file': filepath,
+                        'issues': found[:10],  # 파일당 최대 10개
+                    })
+        except (json.JSONDecodeError, ValueError):
+            continue
+
+    return jsonify({'findings': results})
 
 
 if __name__ == '__main__':

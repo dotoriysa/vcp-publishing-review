@@ -4,7 +4,7 @@ let selectedFile = null;
 let currentIssues = [];
 let lastReportData = null;  // 엑셀/메일용 원본 데이터 보관
 let doneSet = new Set(); // 처리완료된 이슈 인덱스
-let activeFilter = { severity: 'all', category: 'all' };
+let activeFilter = { severity: 'all', category: 'all', undoneOnly: false };
 let viewMode = 'issue';
 
 // 요소 참조
@@ -161,13 +161,14 @@ function showResults(data) {
         currentIssues = data.issues;
         lastReportData = data;
         doneSet = new Set();
-        activeFilter = { severity: 'all', category: 'all' };
+        activeFilter = { severity: 'all', category: 'all', undoneOnly: false };
         viewMode = 'issue';
 
         renderSummary(data.summary);
         renderFilterBar(data.issues);
         applyFilters();
         fetchAiSummary(data);
+        fetchAiDeepReview(data);
     }, 500);
 }
 
@@ -201,6 +202,58 @@ async function fetchAiSummary(data) {
         `;
     } catch {
         aiBody.innerHTML = `<div class="ai-error">AI 분석 중 오류가 발생했습니다.</div>`;
+    }
+}
+
+// AI 직접 파일 분석 (규칙 엔진이 놓친 추가 이슈 발견)
+async function fetchAiDeepReview(data) {
+    const section = document.getElementById('aiDeepSection');
+    const body = document.getElementById('aiDeepBody');
+    section.classList.remove('hidden');
+    body.innerHTML = `<div class="ai-loading"><span class="ai-spinner"></span> Claude가 파일을 직접 읽고 추가 이슈를 찾고 있습니다...</div>`;
+
+    try {
+        const res = await fetch('/api/ai-deep-review', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ issues: data.issues }),
+        });
+        const result = await res.json();
+
+        if (result.error) {
+            section.classList.add('hidden');
+            return;
+        }
+
+        const findings = result.findings || [];
+        if (findings.length === 0) {
+            body.innerHTML = `<div class="ai-deep-empty">규칙 엔진 외 추가 발견된 이슈가 없습니다.</div>`;
+            return;
+        }
+
+        const html = findings.map(fileResult => {
+            const issueRows = (fileResult.issues || []).map(issue => `
+                <div class="ai-deep-issue">
+                    <div class="ai-deep-issue-top">
+                        <span class="issue-severity ${issue.severity}">${issue.severity === 'critical' ? '수정 필수' : '개선 권고'}</span>
+                        <span class="issue-category">${escapeHtml(issue.category || '')}</span>
+                        <span class="ai-deep-desc">${escapeHtml(issue.description || '')}</span>
+                    </div>
+                    ${issue.code ? `<pre class="ai-deep-code">L.${issue.line || '?'}  ${escapeHtml(issue.code)}</pre>` : ''}
+                    ${issue.suggestion ? `<div class="ai-deep-suggestion">→ ${escapeHtml(issue.suggestion)}</div>` : ''}
+                </div>
+            `).join('');
+
+            return `
+                <div class="ai-deep-file-block">
+                    <div class="ai-deep-file-name">${escapeHtml(fileResult.file)}</div>
+                    ${issueRows}
+                </div>`;
+        }).join('');
+
+        body.innerHTML = html;
+    } catch (e) {
+        body.innerHTML = `<div class="ai-deep-empty">AI 추가 분석 중 오류: ${e.message}</div>`;
     }
 }
 
@@ -238,7 +291,9 @@ function renderFilterBar(issues) {
         <div class="filter-divider"></div>
         <span class="filter-label">카테고리</span>
         <button class="filter-btn active" data-cat="all" onclick="setCategory('all', this)">전체</button>
-        ${categories.map(cat => `<button class="filter-btn" data-cat="${cat}" onclick="setCategory('${cat}', this)">${cat}</button>`).join('')}
+        ${categories.map(cat => `<button class="filter-btn" data-cat="${escapeHtml(cat)}" onclick="setCategory('${escapeHtml(cat)}', this)">${escapeHtml(cat)}</button>`).join('')}
+        <div class="filter-divider"></div>
+        <button class="filter-btn filter-btn-undone" id="filterUndoneBtn" onclick="toggleUndoneFilter(this)">미처리만 보기</button>
     `;
 
     document.getElementById('viewIssue').classList.add('active');
@@ -270,6 +325,12 @@ function setView(mode) {
     applyFilters();
 }
 
+function toggleUndoneFilter(btn) {
+    activeFilter.undoneOnly = !activeFilter.undoneOnly;
+    btn.classList.toggle('active-undone', activeFilter.undoneOnly);
+    applyFilters();
+}
+
 function applyFilters() {
     let filtered = currentIssues;
     if (activeFilter.severity !== 'all') {
@@ -277,6 +338,9 @@ function applyFilters() {
     }
     if (activeFilter.category !== 'all') {
         filtered = filtered.filter(i => i.category === activeFilter.category);
+    }
+    if (activeFilter.undoneOnly) {
+        filtered = filtered.filter(i => !doneSet.has(currentIssues.indexOf(i)));
     }
 
     const countEl = document.getElementById('filterCount');

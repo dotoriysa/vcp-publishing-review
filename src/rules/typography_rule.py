@@ -82,7 +82,11 @@ class TypographyRule(BaseRule):
                 occ_seen = set()
                 occ_list = []
                 for filepath, content in files.items():
+                    if len(occ_list) >= 300:
+                        break
                     for line_num, line in enumerate(content.splitlines(), start=1):
+                        if len(occ_list) >= 300:
+                            break
                         for pattern in COMPILED_PATTERNS:
                             for m in pattern.findall(line):
                                 if m == value and (filepath, line_num) not in occ_seen:

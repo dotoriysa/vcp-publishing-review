@@ -94,6 +94,27 @@
                             <span class="rule-desc">인라인 스타일·sx prop 혼용, deprecated makeStyles</span>
                         </div>
                     </label>
+                    <label class="rule-item">
+                        <input type="checkbox" name="rules" value="console_log" checked>
+                        <div class="rule-content">
+                            <span class="rule-name">console.log 미제거</span>
+                            <span class="rule-desc">배포 코드 내 console.log·debugger 잔류 여부</span>
+                        </div>
+                    </label>
+                    <label class="rule-item">
+                        <input type="checkbox" name="rules" value="zindex" checked>
+                        <div class="rule-content">
+                            <span class="rule-name">z-index 매직넘버</span>
+                            <span class="rule-desc">z-index 임의 큰 숫자(100↑) 직접 사용 여부</span>
+                        </div>
+                    </label>
+                    <label class="rule-item">
+                        <input type="checkbox" name="rules" value="accessibility" checked>
+                        <div class="rule-content">
+                            <span class="rule-name">접근성(a11y)</span>
+                            <span class="rule-desc">outline:none 제거·img alt 누락·button type 누락</span>
+                        </div>
+                    </label>
                 </div>
             </section>
 
@@ -126,6 +147,15 @@
                             <span class="ai-spinner"></span> Claude가 코드를 분석하고 있습니다...
                         </div>
                     </div>
+                </div>
+
+                <!-- AI 추가 발견 섹션 -->
+                <div class="ai-deep-section hidden" id="aiDeepSection">
+                    <div class="ai-deep-header">
+                        <span class="ai-deep-title">AI 추가 발견</span>
+                        <span class="ai-deep-sub">규칙 엔진이 놓친 이슈를 Claude가 파일을 직접 읽어 추가 발견</span>
+                    </div>
+                    <div class="ai-deep-body" id="aiDeepBody"></div>
                 </div>
 
                 <!-- 필터 툴바 -->

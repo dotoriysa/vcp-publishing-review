@@ -38,5 +38,3 @@ python app.py
 `docs/how_to_add_rules.md` 참고
 
 ---
-
-*문의: INNOCEAN 개발팀*

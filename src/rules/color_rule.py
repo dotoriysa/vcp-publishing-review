@@ -64,7 +64,7 @@ class ColorRule(BaseRule):
                 )
                 occurrences = [
                     {'line': ln, 'code': code, 'file': fp}
-                    for fp, ln, code in usages
+                    for fp, ln, code in usages[:300]  # 최대 300건만 저장
                 ]
                 issues.append(self._make_issue(
                     file=usages[0][0],
@@ -90,7 +90,7 @@ class ColorRule(BaseRule):
                 if len(usages) > 1:  # 2회 이상 사용 시 경고
                     occurrences = [
                         {'line': ln, 'code': code, 'file': fp}
-                        for fp, ln, code in usages
+                        for fp, ln, code in usages[:300]  # 최대 300건만 저장
                     ]
                     issues.append(self._make_issue(
                         file=usages[0][0],
