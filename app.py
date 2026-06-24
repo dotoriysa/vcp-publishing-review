@@ -223,21 +223,53 @@ def suggest_fix():
         ),
         '색상': (
             '【위반 기준】 색상 코드(#hex, rgb(), rgba())를 코드에 직접 입력하는 것은\n'
-            '현대오토에버 VCP 코드 가이드라인 위반입니다. 반드시 HMG Design System 색상 변수를 사용해야 합니다.\n\n'
-            '【올바른 방식】\n'
-            '  import { colors } from \'@/shared/theme\';\n'
-            '  sx={{ color: colors.gray900, backgroundColor: colors.white }}\n\n'
-            '【HMG 색상 변수 매핑표 - 반드시 이 변수명을 사용할 것】\n'
-            '  #000000          → colors.black\n'
-            '  #111111          → colors.gray900\n'
-            '  #333333          → colors.gray800\n'
-            '  #666666          → colors.gray600\n'
-            '  #999999          → colors.gray400\n'
-            '  #cccccc, #CCCCCC → colors.gray200\n'
-            '  #e9eaec, #E9EAEC → colors.gray100\n'
-            '  #ffffff, #FFFFFF → colors.white\n'
-            '  #8333e6, #8333E6 → colors.purple500 (또는 colors.primary)\n'
-            '  위 목록에 없는 색상 → 프로젝트 내 색상 상수 파일에 정의 후 참조'
+            '현대오토에버 VCP 코드 가이드라인 위반입니다.\n'
+            '반드시 HAE Design System CSS 커스텀 프로퍼티 또는 시멘틱 토큰을 사용해야 합니다.\n\n'
+            '【올바른 방식 — CSS 파일】\n'
+            '  color: var(--color-common-gray-10);          /* 일반 텍스트 */\n'
+            '  background: var(--color-light-surface-neutral);\n\n'
+            '【올바른 방식 — MUI sx prop】\n'
+            '  sx={{ color: \'var(--color-common-gray-10)\' }}\n\n'
+            '【HAE Design System 색상 토큰 매핑표】\n'
+            '  ※ 출처: https://ux-standard.hyundai-autoever.com/react/1.1.1\n\n'
+            '  ─ Common Gray (텍스트/배경/구분선) ──────────────\n'
+            '  #131416 → var(--color-common-gray-10)   (가장 어두운 회색)\n'
+            '  #272a2f → var(--color-common-gray-20)\n'
+            '  #33363d → var(--color-common-gray-25)\n'
+            '  #585e6a → var(--color-common-gray-40)\n'
+            '  #6b7280 → var(--color-common-gray-50)   (중간 회색)\n'
+            '  #878e9b → var(--color-common-gray-60)\n'
+            '  #a6abb5 → var(--color-common-gray-70)\n'
+            '  #c5c8ce → var(--color-common-gray-80)\n'
+            '  #d3d5da → var(--color-common-gray-85)\n'
+            '  #dedfe3 → var(--color-common-gray-90)\n'
+            '  #e6e7ea → var(--color-common-gray-92)\n'
+            '  #eff0f1 → var(--color-common-gray-95)\n'
+            '  #f9fafa → var(--color-common-gray-98)   (가장 밝은 회색)\n\n'
+            '  ─ Hyundai Primary (현대차 VCP 브랜드 블루) ──────\n'
+            '  #002c5f → var(--color-hyundai-primary-25)  ★현대 대표 블루\n'
+            '  #001124 → var(--color-hyundai-primary-10)\n'
+            '  #006be5 → var(--color-hyundai-primary-50)\n'
+            '  #0177ff → var(--color-hyundai-primary-55)\n\n'
+            '  ─ Common Blue ──────────────────────────────────\n'
+            '  #0056ff → var(--color-common-blue-50)\n'
+            '  #3378ff → var(--color-common-blue-60)\n'
+            '  #003399 → var(--color-common-blue-30)\n\n'
+            '  ─ Genesis Primary (검정 계열) ──────────────────\n'
+            '  #111111 → var(--color-genesis-primary-10)\n'
+            '  #cccccc → var(--color-genesis-primary-80)\n'
+            '  #f2f2f2 → var(--color-genesis-primary-95)\n\n'
+            '  ─ 시멘틱 토큰 (권장) ───────────────────────────\n'
+            '  텍스트(강): var(--color-light-text-neutral-strongest)\n'
+            '  텍스트(보통): var(--color-light-text-neutral-strong)\n'
+            '  텍스트(약): var(--color-light-text-neutral)\n'
+            '  배경: var(--color-light-background-white)\n'
+            '  표면: var(--color-light-surface-neutral)\n'
+            '  구분선: var(--color-light-divider-neutral-weaker)\n'
+            '  테두리: var(--color-light-border-neutral)\n'
+            '  브랜드: var(--color-light-element-brand-strong)\n\n'
+            '  위 목록에 없는 색상 → HAE Design System 문서 참조 후\n'
+            '  가장 가까운 시멘틱 토큰(--color-light-*)을 사용할 것'
         ),
         '!important': (
             '【위반 기준】 CSS !important 남용은 현대오토에버 VCP 코드 가이드라인 위반입니다.\n'
@@ -246,7 +278,7 @@ def suggest_fix():
             '  방법1. CSS 선택자 명시도(specificity) 높이기:\n'
             '    .parent .child .target { color: red; }  /* !important 없이 */\n'
             '  방법2. MUI sx prop 우선순위 활용:\n'
-            '    sx={{ \'& .MuiButton-root\': { color: colors.primary } }}\n'
+            '    sx={{ \'& .MuiButton-root\': { color: \'var(--color-hyundai-primary-25)\' } }}\n'
             '  방법3. 꼭 필요한 경우 1개로 제한, 한 줄에 여러 !important 절대 금지'
         ),
         '스크롤바': (
@@ -283,7 +315,7 @@ def suggest_fix():
             '현대오토에버 VCP 코드 가이드라인 위반입니다.\n\n'
             '【올바른 방식 - MUI v5 표준】\n'
             '  방법1. sx prop:\n'
-            '    <Box sx={{ color: colors.gray900, fontSize: 14 }} />\n'
+            '    <Box sx={{ color: \'var(--color-common-gray-10)\', fontSize: 14 }} />\n'
             '  방법2. styled() 컴포넌트:\n'
             '    const StyledBox = styled(Box)(({ theme }) => ({\n'
             '      color: theme.palette.primary.main,\n'
@@ -320,7 +352,7 @@ def suggest_fix():
             '【outline: none 대체 방법】\n'
             '  /* 키보드 포커스일 때만 보이게 */\n'
             '  &:focus-visible {\n'
-            '    outline: 2px solid colors.primary;\n'
+            '    outline: 2px solid var(--color-hyundai-primary-25);\n'
             '    outline-offset: 2px;\n'
             '  }\n\n'
             '【img alt 필수 작성】\n'
@@ -379,10 +411,12 @@ CATEGORY_GUIDELINES = {
     ),
     '색상': (
         '【위반】 #hex 색상 코드를 직접 입력. '
-        '【수정】 HMG Design System 색상 변수 사용: '
-        'import { colors } from \'@/shared/theme\'; → sx={{ color: colors.gray900 }}. '
-        '매핑: #111111→gray900, #333333→gray800, #666666→gray600, '
-        '#999999→gray400, #cccccc→gray200, #ffffff→white, #8333e6→purple500(primary)'
+        '【수정】 HAE Design System CSS 커스텀 프로퍼티 사용. '
+        '주요 매핑: #131416→var(--color-common-gray-10), #6b7280→var(--color-common-gray-50), '
+        '#eff0f1→var(--color-common-gray-95), #002c5f→var(--color-hyundai-primary-25)(현대 브랜드 블루), '
+        '#0056ff→var(--color-common-blue-50), #111111→var(--color-genesis-primary-10). '
+        '매핑에 없는 색상은 HAE Design System 시멘틱 토큰 참조: '
+        'var(--color-light-text-neutral-strongest) / var(--color-light-surface-neutral) 등'
     ),
     '!important': (
         '【위반】 CSS !important 과다 사용. 한 줄에 2개 이상은 즉시 수정 필요. '
@@ -899,10 +933,19 @@ def ai_full_review_stream():
 {snippet}{trunc_note}
 
 【검수 기준 (현대오토에버 VCP 기준 전체)】
-1. 색상: #hex 직접 사용 금지 → colors.gray900 / colors.primary 등 HMG 토큰 사용
-   매핑: #111111→colors.gray900, #666→colors.gray500, #999→colors.gray400,
-         #ccc→colors.gray200, #f5f5f5→colors.gray50, #0064ff→colors.primary,
-         rgba(0,0,0,0.5)→colors.dimmed 등
+1. 색상: #hex 직접 사용 금지 → HAE Design System CSS 커스텀 프로퍼티 사용
+   (출처: https://ux-standard.hyundai-autoever.com/react/1.1.1)
+   주요 매핑:
+     #131416 → var(--color-common-gray-10)    #6b7280 → var(--color-common-gray-50)
+     #dedfe3 → var(--color-common-gray-90)    #eff0f1 → var(--color-common-gray-95)
+     #002c5f → var(--color-hyundai-primary-25) ← 현대 대표 브랜드 블루
+     #0056ff → var(--color-common-blue-50)    #111111 → var(--color-genesis-primary-10)
+     #cccccc → var(--color-genesis-primary-80)
+   위 목록에 없는 색상 → HAE Design System 시멘틱 토큰 사용 권고:
+     텍스트: var(--color-light-text-neutral-strongest) / strong / neutral / weak
+     배경: var(--color-light-background-white) / var(--color-light-surface-neutral)
+     구분선: var(--color-light-divider-neutral-weaker)
+     테두리: var(--color-light-border-neutral)
 2. 타이포그래피: font-size/font-weight/line-height 하드코딩 금지 → theme.typography.body1 등 MUI 토큰
 3. !important 남용: 한 줄에 2개 이상 또는 불필요한 반복 사용
 4. 스크롤바: ::-webkit-scrollbar 커스터마이징 지양 (크로스브라우저 미지원)
@@ -1055,7 +1098,9 @@ def ai_deep_review():
 {snippet}{trunc_note}
 
 【검수 기준 (현대오토에버 VCP 기준)】
-- HMG 디자인 시스템 color 토큰 미사용 (#hex 직접 사용 → colors.gray900 등으로 교체)
+- HAE Design System color 토큰 미사용 (#hex 직접 사용 → var(--color-common-gray-10) 등 CSS 커스텀 프로퍼티로 교체)
+  * 알려진 매핑: #131416→var(--color-common-gray-10), #002c5f→var(--color-hyundai-primary-25), #0056ff→var(--color-common-blue-50)
+  * 매핑 없는 색상 → HAE Design System 시멘틱 토큰(--color-light-text-*, --color-light-surface-* 등) 사용 권고
 - MUI theme.typography 미사용 (font-size/font-weight/line-height 하드코딩)
 - outline: none / outline: 0 (키보드 접근성 파괴)
 - z-index 매직넘버 100 이상 직접 사용 (→ theme.zIndex 토큰)
